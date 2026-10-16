@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# LaTeX report: only the compiled PDF is tracked, sources stay local
+report/*
+!report/report.pdf

@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Language.Cli/Language.Cli.csproj" />
-    <Project Path="src/Language/Language.csproj" />
+    <Project Path="MiniProject.Language.Cli/Language.Cli.csproj" />
+    <Project Path="MiniProject.Language/MiniProject.Language.csproj" />
   </Folder>
 </Solution>
