@@ -3,4 +3,5 @@
     <Project Path="MiniProject.Language.Cli/Language.Cli.csproj" />
     <Project Path="MiniProject.Language/MiniProject.Language.csproj" />
   </Folder>
+  <Project Path="MiniProject.Language.Tests/MiniProject.Language.Tests.csproj" />
 </Solution>
