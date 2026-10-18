@@ -12,10 +12,59 @@ abstract record Value
             && a.Fields.Zip(b.Fields).All(x => ValueEquals(x.First, x.Second)),
         _ => throw new Exception("Invalid operation.")
     };
+
+    public abstract string Show(Env env);
 }
-sealed record V_Nat(ulong Value) : Value;
-sealed record V_Int(long Value) : Value;
-sealed record V_Real(double Value) : Value;
-sealed record V_Bool(bool Value) : Value;
-sealed record V_Record(string Name, IReadOnlyList<Value> Fields) : Value;
-sealed record V_Closure(IReadOnlyList<Param> Params, B_Block Body, Env Env) : Value;
+
+sealed record V_Placeholder : Value
+{
+    public override string Show(Env env)
+    {
+        throw new Exception("Congratulations! You did the impossible!");
+    }
+}
+sealed record V_Nat(ulong Value) : Value
+{
+    public override string Show(Env env)
+    {
+        return Value.ToString();
+    }
+}
+sealed record V_Int(long Value) : Value
+{
+    public override string Show(Env env)
+    {
+        return Value.ToString();
+    }
+}
+sealed record V_Real(double Value) : Value
+{
+    public override string Show(Env env)
+    {
+        return Value.ToString();
+    }
+}
+sealed record V_Bool(bool Value) : Value
+{
+    public override string Show(Env env)
+    {
+        return Value.ToString();
+    }
+}
+sealed record V_Record(string Name, IReadOnlyList<Value> Fields) : Value
+{
+    public override string Show(Env env) // env is not modified we just need the record table 
+    {
+        IReadOnlyList<Param> _params = env.GetRecord(Name);
+        List<(string, Value)> field_values = _params.Select(x => x.Name).Zip(Fields).ToList();
+        string field_value_string = string.Join(", ", field_values.Select(x => $"{x.Item1} = {x.Item2.Show(env)}"));
+        return $"{Name}({field_value_string})";
+    }
+}
+sealed record V_Closure(IReadOnlyList<Param> Params, B_Block Body, Env Env) : Value
+{
+    public override string Show(Env env)
+    {
+        return $"<function({string.Join(", ", Params.Select(x => $"{x.Name}: {x.Type}"))})>";
+    }
+}

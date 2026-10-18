@@ -18,6 +18,12 @@ public class E_Op_Tests
     public void Sub_int_can_go_negative() => Assert.Equal(new V_Int(-3), Eval(2L, new OP_Sub(), 5L));
 
     [Fact]
+    public void Sub_nat() => Assert.Equal(new V_Nat(2), Eval(5UL, new OP_Sub(), 3UL));
+
+    [Fact]
+    public void Sub_nat_below_zero_gives_zero() => Assert.Equal(new V_Nat(0), Eval(2UL, new OP_Sub(), 5UL));
+
+    [Fact]
     public void Mult_nat() => Assert.Equal(new V_Nat(6), Eval(2UL, new OP_Mult(), 3UL));
 
     [Fact]

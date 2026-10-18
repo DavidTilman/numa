@@ -98,4 +98,13 @@ In more detail:
     - one test file per statement (S_Decl, S_Assign, S_While, S_Cond,
       S_Return);
     - block tests (B_Block: empty block, order, early return, scoping and
-      shadowing).
+      shadowing);
+    - S_Print tests (output of each kind of value, nested records,
+      closures, printing inside a function call), capturing console output;
+    - P_Prog tests (recursion, mutual recursion, hoisting, functions as values,
+      functions not seeing top-level variables, records, duplicate names,
+      top-level Ret); these found an inverted condition in Nat subtraction,
+      and Nat subtraction tests were added to E_Op.
+- Reviewed P_Prog: closures must capture the finished global environment
+  (two passes: placeholder Refs, then fill), and found the parameter
+  duplicate check using the wrong set.

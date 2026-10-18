@@ -25,7 +25,7 @@ sealed record OP_Sub : Operation
     {
         return (V1, V2) switch
         {
-            (V_Nat a, V_Nat b) => new V_Nat(a.Value <= b.Value ? a.Value - b.Value : 0UL),
+            (V_Nat a, V_Nat b) => new V_Nat(a.Value >= b.Value ? a.Value - b.Value : 0UL),
             (V_Int a, V_Int b) => new V_Int(a.Value - b.Value),
             (V_Real a, V_Real b) => new V_Real(a.Value - b.Value),
             _ => throw new Exception("Invalid operation.")
