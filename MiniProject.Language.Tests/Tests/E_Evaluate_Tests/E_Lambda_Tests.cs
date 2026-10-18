@@ -24,7 +24,7 @@ public class E_Lambda_Tests
         V_Closure clo = Assert.IsType<V_Closure>(new E_Lambda(Params, new T_Nat(), body).Evaluate(TestEnv.Empty));
 
         S_Return ret = Assert.IsType<S_Return>(Assert.Single(clo.Body.Statements));
-        Assert.Same(body, ret.Value);
+        Assert.Same(body, ret.Expr);
     }
 
     [Fact]

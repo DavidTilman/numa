@@ -1,3 +1,9 @@
 namespace MiniProject.Language.Structure;
 
-sealed record P_Prog(IReadOnlyList<Com> Commands);
+sealed record P_Prog(IReadOnlyList<Com> Commands)
+{
+    public Env Execute()
+    {
+        
+    }
+}

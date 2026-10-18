@@ -1,0 +1,101 @@
+AI usage log (Claude)
+=====================
+
+Raw list of what AI contributed, to be condensed into a paragraph in the report.
+Renames, trivial fixes, and code I wrote that AI only confirmed are left out.
+
+
+1. Report: operational semantics
+--------------------------------
+
+Existing note in the report (copied from report.tex):
+
+  AI (Claude) was used throughout this section as a tutor and checker. It
+  proposed the environment/store model, the shape of the judgements and the
+  normal/ret outcomes; I wrote the expression, block and statement rules, which
+  it then corrected (notably the premises of E-FIELD and E-RECORD, the store
+  passing in B-SEQ, and the outcome in S-WHILE-T). E-LAMBDA's closure structure
+  and the premises of E-APP were developed with its help, and S-VAR, S-ASSIGN,
+  S-WHILE-RET, P-PROG and the explanation of E-APP were written by it. It also
+  proposed the record table Delta (its notation entry and its use in E-FIELD and
+  P-PROG) and wrote the explanation of P-PROG. It also fixed typesetting errors.
+
+In more detail:
+
+- Grammar: rewrote the syntax block to use a block nonterminal b with semicolon
+  terminators, and the abbreviation of an else-less If as If (e) b Else {}.
+- Notation: wrote the notation entry for sequences (bar notation, pointwise
+  updates rho[x -> l], and l-bar not in dom(sigma)), and the entry for the
+  record table Delta.
+- Converted E-RECORD, E-LAMBDA and E-APP to bar notation, and reordered the
+  judgements to put results first.
+- Rule corrections made to my drafts:
+    - removed rho from the results of expression rules;
+    - side conditions written with = instead of the evaluation arrow;
+    - E-OP: added the premises and the semantic operator (oplus-hat);
+    - E-FIELD: the middle premise (record declaration / Delta lookup), and
+      f = f_i instead of f = v_i;
+    - E-RECORD: passing the store from one argument to the next;
+    - E-APP: the final store, dom(sigma_n), the fresh locations and the body
+      premise;
+    - E-COND: separate T/F rules;
+    - B-SEQ: the stores, and wrapping the remaining statements as a block;
+    - B-RET: result ret v instead of v;
+    - S-WHILE-T: a general outcome r instead of normal (a real semantic bug).
+- Record table Delta: proposed it so record declarations are available to
+  E-FIELD at run time (record values are positional), added it as a premise of
+  P-PROG and in E-FIELD.
+- Explanations: wrote the E-APP paragraph; wrote the P-PROG item list (Delta,
+  locations, rho_g, sigma_0 and hoisting, the final block) and corrected my
+  first two items; suggested the content for the S-VAR, while and if
+  explanations (rho is extended only by S-VAR, S-WHILE-T is recursive, ret
+  passes outwards, block variables are discarded).
+- Explained design questions: why records need no locations while functions
+  do, and why the while/if rules return the same rho.
+- LaTeX: fixed build errors (missing braces, $ inside mathpar, Biber cache) and
+  split the rules into several mathpar blocks so they could break across pages.
+
+
+2. Design advice for the implementation
+---------------------------------------
+
+- Runtime state: Env as an immutable map from names to Ref (rho), Ref as a
+  mutable location, and the store sigma as the set of all Refs. Fixed the Ref
+  class so its value is a settable property.
+- Outcome as a record hierarchy (O_Normal | O_Ret(Value)) instead of an enum
+  with a nullable value.
+- Closures hold a block body, so lambdas (wrapped as {Ret e;}) and functions
+  share one representation.
+- Where to keep Delta (built once in P-Prog, kept out of rho), and ways to pass
+  it to E_Field.
+- Statement execution must return (Outcome, Env) so S_Decl can extend the
+  environment; blocks discard the returned environment (scoping).
+- Types are erased at run time: S_Decl, E_Lambda and Param keep their types for
+  the type checker only; runtime type checks are not part of the rules.
+- Pointed out issues to decide or document:
+    - Nat subtraction wraps around in C# (choose error or floor at zero);
+    - && and || are strict, not short-circuiting, and are missing from the
+      report's grammar;
+    - the recursive S_While will overflow the stack on long loops;
+    - records containing lists (T_Func, V_Record) compare lists by reference.
+
+
+3. Code
+-------
+
+- E_Appl: corrected my draft so the body runs in the closure's environment
+  (static scoping), the parameters are bound to fresh Refs, and the outcome
+  must be ret v. Also fixed Env.Bind, which discarded the result of SetItem.
+- E_Field: the loop that finds the field index, and merging the type checks
+  into one pattern match.
+- Value.ValueEquals: wrote the equality helper (recursive on record fields,
+  error on closures) and made OP_EQ / OP_NEQ use it.
+- Test project: explained the xUnit setup (project, reference,
+  InternalsVisibleTo), and wrote all the tests:
+    - TestEnv helper (empty Env, declaring records in Delta);
+    - one test file per expression (E_Lit, E_Var, E_Op, E_Field, E_RecCon,
+      E_Lambda, E_Appl, E_Cond);
+    - one test file per statement (S_Decl, S_Assign, S_While, S_Cond,
+      S_Return);
+    - block tests (B_Block: empty block, order, early return, scoping and
+      shadowing).
