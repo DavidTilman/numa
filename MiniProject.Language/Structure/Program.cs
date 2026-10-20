@@ -7,29 +7,11 @@ public abstract record Prog
 }
 public sealed record P_Prog(IReadOnlyList<Com> Commands) : Prog
 {
-    public List<D_Func> Funcs = [];
-    public List<Stmt> Stmts = [];
-    public List<D_Record> Records = [];
+    public IEnumerable<D_Func> Funcs => Commands.OfType<C_Decl>().Select(c => c.Decl).OfType<D_Func>();
+    public IEnumerable<D_Record> Records => Commands.OfType<C_Decl>().Select(c => c.Decl).OfType<D_Record>();
+    public IEnumerable<Stmt> Stmts => Commands.OfType<C_Stmt>().Select(c => c.Stmt);
     public Env Establish()
     {
-
-        foreach (Com c in Commands)
-        {
-            switch (c)
-            {
-                case C_Decl d:
-                    switch (d.Decl)
-                    {
-                        case D_Func f: Funcs.Add(f); break;
-                        case D_Record r: Records.Add(r); break;
-                    } 
-                    break;
-                case C_Stmt s:
-                    Stmts.Add(s.Stmt); 
-                    break;
-            }
-        }
-        
         HashSet<string> seen = [];
         foreach (D_Func func in Funcs)
         {
@@ -64,7 +46,7 @@ public sealed record P_Prog(IReadOnlyList<Com> Commands) : Prog
     public override void Execute()
     {
         Env global_env = Establish();
-        B_Block main = new(Stmts);
+        B_Block main = new(Stmts.ToList());
         Outcome o = main.Execute(global_env);
         if (o is not O_Normal) throw new Exception("Program did not exit normally.");
     }
