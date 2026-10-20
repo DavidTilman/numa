@@ -1,8 +1,12 @@
 namespace MiniProject.Language.Structure;
 
-sealed record B_Block(IReadOnlyList<Stmt> Statements)
+public abstract record Block
 {
-    public Outcome Execute(Env Env)
+    public abstract Outcome Execute(Env Env);
+}
+public sealed record B_Block(IReadOnlyList<Stmt> Statements) : Block
+{
+    public override Outcome Execute(Env Env)
     {
         if (Statements.Count == 0) return new O_Normal();
         Stmt cur = Statements[0];

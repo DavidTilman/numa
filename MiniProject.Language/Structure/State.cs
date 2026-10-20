@@ -1,11 +1,11 @@
 using System.Collections.Immutable;
 namespace MiniProject.Language.Structure;
 
-sealed class Ref(Value value)
+public sealed class Ref(Value value)
 {
     public Value Value { get; set; } = value;
 }
-sealed record Env(ImmutableDictionary<string, Ref> Vars, ImmutableDictionary<string, IReadOnlyList<Param>> Records)
+public sealed record Env(ImmutableDictionary<string, Ref> Vars, ImmutableDictionary<string, IReadOnlyList<Param>> Records)
 {
     public Ref GetRef(string name)
     {

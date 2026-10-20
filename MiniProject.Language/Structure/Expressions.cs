@@ -1,10 +1,12 @@
+using System.Reflection.Metadata.Ecma335;
+
 namespace MiniProject.Language.Structure;
 
-abstract record Expr
+public abstract record Expr
 {
     public abstract Value Evaluate(Env Env);
 }
-sealed record E_Lit(object Value) : Expr
+public sealed record E_Lit(object Value) : Expr
 {
     public override Value Evaluate(Env Env) => Value switch
     {
@@ -15,21 +17,33 @@ sealed record E_Lit(object Value) : Expr
         _ => throw new Exception("Invalid Literal")
     };
 }
-sealed record E_Var(string Name) : Expr
+
+public sealed record E_UnaryNegate(Expr e) : Expr
+{
+    // E-Neg: negating a Nat gives an Int, since the result can be below zero.
+    public override Value Evaluate(Env Env) => e.Evaluate(Env) switch
+    {
+        V_Nat n  => new V_Int(-checked((long)n.Value)),
+        V_Int i  => new V_Int(checked(-i.Value)),
+        V_Real r => new V_Real(-r.Value),
+        _ => throw new Exception("Invalid operation.")
+    };
+}
+public sealed record E_Var(string Name) : Expr
 {
     public override Value Evaluate(Env Env)
     {
         return Env.GetRef(Name).Value;
     }
 }
-sealed record E_Op(Expr E1, Operation Op, Expr E2) : Expr
+public sealed record E_Op(Expr E1, Operation Op, Expr E2) : Expr
 {
     public override Value Evaluate(Env Env)
     {
         return Op.Evaluate(E1.Evaluate(Env), E2.Evaluate(Env));
     }
 }
-sealed record E_Field(Expr Target, string Field) : Expr
+public sealed record E_Field(Expr Target, string Field) : Expr
 {
     public override Value Evaluate(Env Env)
     {
@@ -48,7 +62,7 @@ sealed record E_Field(Expr Target, string Field) : Expr
         return rec.Fields[index];
     }
 }
-sealed record E_Appl(Expr Target, IReadOnlyList<Expr> Args) : Expr
+public sealed record E_Appl(Expr Target, IReadOnlyList<Expr> Args) : Expr
 {
     public override Value Evaluate(Env Env)
     {
@@ -68,7 +82,7 @@ sealed record E_Appl(Expr Target, IReadOnlyList<Expr> Args) : Expr
         return ret.Value;
     }
 }
-sealed record E_RecCon(string Target, IReadOnlyList<Expr> Args) : Expr
+public sealed record E_RecCon(string Target, IReadOnlyList<Expr> Args) : Expr
 {
     public override Value Evaluate(Env Env)
     {
@@ -79,11 +93,11 @@ sealed record E_RecCon(string Target, IReadOnlyList<Expr> Args) : Expr
     }
 }
 
-sealed record E_Lambda(IReadOnlyList<Param> Params, Type ReturnType, Expr Body) : Expr
+public sealed record E_Lambda(IReadOnlyList<Param> Params, Type ReturnType, Expr Body) : Expr
 {
     public override Value Evaluate(Env Env) => new V_Closure(Params, new B_Block([new S_Return(Body)]), Env);
 }
-sealed record E_Cond(Expr Cond, Expr OnTrue, Expr OnFalse) : Expr
+public sealed record E_Cond(Expr Cond, Expr OnTrue, Expr OnFalse) : Expr
 {
     public override Value Evaluate(Env Env)
     {

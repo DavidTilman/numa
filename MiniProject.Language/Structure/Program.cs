@@ -1,14 +1,17 @@
 using System.Collections.Immutable;
 
 namespace MiniProject.Language.Structure;
-
-sealed record P_Prog(IReadOnlyList<Com> Commands)
+public abstract record Prog
 {
-    public void Execute()
+    public abstract void Execute();
+}
+public sealed record P_Prog(IReadOnlyList<Com> Commands) : Prog
+{
+    public List<D_Func> Funcs = [];
+    public List<Stmt> Stmts = [];
+    public List<D_Record> Records = [];
+    public Env Establish()
     {
-        List<D_Func> funcs = [];
-        List<D_Record> records = [];
-        List<Stmt> stmts = [];
 
         foreach (Com c in Commands)
         {
@@ -17,18 +20,18 @@ sealed record P_Prog(IReadOnlyList<Com> Commands)
                 case C_Decl d:
                     switch (d.Decl)
                     {
-                        case D_Func f: funcs.Add(f); break;
-                        case D_Record r: records.Add(r); break;
+                        case D_Func f: Funcs.Add(f); break;
+                        case D_Record r: Records.Add(r); break;
                     } 
                     break;
                 case C_Stmt s:
-                    stmts.Add(s.Stmt); 
+                    Stmts.Add(s.Stmt); 
                     break;
             }
         }
         
         HashSet<string> seen = [];
-        foreach (D_Func func in funcs)
+        foreach (D_Func func in Funcs)
         {
             if (!seen.Add(func.Name))
                 throw new Exception($"Function {func.Name} is defined more than once.");
@@ -39,7 +42,7 @@ sealed record P_Prog(IReadOnlyList<Com> Commands)
         }
         
         Dictionary<string, IReadOnlyList<Param>> delta = [];
-        foreach (D_Record rec in records)
+        foreach (D_Record rec in Records)
         {
             if (delta.TryGetValue(rec.Name, out _)) throw new Exception($"Record {rec.Name} is defined more than once.");
             delta.Add(rec.Name, rec.Params);
@@ -47,16 +50,21 @@ sealed record P_Prog(IReadOnlyList<Com> Commands)
 
         Env global_env = new([], delta.ToImmutableDictionary());
         
-        foreach (D_Func func in funcs)
+        foreach (D_Func func in Funcs)
         {
             global_env = global_env.Bind(func.Name, new V_Placeholder());
         }
-        foreach (D_Func func in funcs)
+        foreach (D_Func func in Funcs)
         {
             global_env.GetRef(func.Name).Value = new V_Closure(func.Params, func.Body, global_env);
         }
 
-        B_Block main = new(stmts);
+        return global_env;
+    }
+    public override void Execute()
+    {
+        Env global_env = Establish();
+        B_Block main = new(Stmts);
         Outcome o = main.Execute(global_env);
         if (o is not O_Normal) throw new Exception("Program did not exit normally.");
     }

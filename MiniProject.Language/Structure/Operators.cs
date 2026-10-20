@@ -1,11 +1,11 @@
 namespace MiniProject.Language.Structure;
 
-abstract record Operation
+public abstract record Operation
 {
     public abstract Value Evaluate(Value V1, Value V2);
 }
 
-sealed record OP_Plus : Operation
+public sealed record OP_Plus : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -19,7 +19,7 @@ sealed record OP_Plus : Operation
     }
 }
 
-sealed record OP_Sub : Operation
+public sealed record OP_Sub : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -33,7 +33,7 @@ sealed record OP_Sub : Operation
     }
 }
 
-sealed record OP_Mult : Operation
+public sealed record OP_Mult : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -47,7 +47,7 @@ sealed record OP_Mult : Operation
     }
 }
 
-sealed record OP_Div : Operation
+public sealed record OP_Div : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -61,7 +61,7 @@ sealed record OP_Div : Operation
     }
 }
 
-sealed record OP_Mod : Operation
+public sealed record OP_Mod : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -75,7 +75,7 @@ sealed record OP_Mod : Operation
     }
 }
 
-sealed record OP_LT : Operation
+public sealed record OP_LT : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -89,7 +89,7 @@ sealed record OP_LT : Operation
     }
 }
 
-sealed record OP_LEQ : Operation
+public sealed record OP_LEQ : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -103,7 +103,7 @@ sealed record OP_LEQ : Operation
     }
 }
 
-sealed record OP_EQ : Operation
+public sealed record OP_EQ : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -111,7 +111,7 @@ sealed record OP_EQ : Operation
     }
 }
 
-sealed record OP_NEQ : Operation
+public sealed record OP_NEQ : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -119,7 +119,7 @@ sealed record OP_NEQ : Operation
     }
 }
 
-sealed record OP_GET : Operation
+public sealed record OP_GEQ : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -133,7 +133,7 @@ sealed record OP_GET : Operation
     }
 }
 
-sealed record OP_GT : Operation
+public sealed record OP_GT : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -147,7 +147,7 @@ sealed record OP_GT : Operation
     }
 }
 
-sealed record OP_OR : Operation
+public sealed record OP_OR : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {
@@ -159,7 +159,7 @@ sealed record OP_OR : Operation
     }
 }
 
-sealed record OP_AND : Operation
+public sealed record OP_AND : Operation
 {
     public override Value Evaluate(Value V1, Value V2)
     {

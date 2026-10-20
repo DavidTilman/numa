@@ -48,7 +48,7 @@ public class E_Op_Tests
     public void NEQ_true() => Assert.Equal(new V_Bool(true), Eval(2UL, new OP_NEQ(), 3UL));
 
     [Fact]
-    public void GET_equal() => Assert.Equal(new V_Bool(true), Eval(3UL, new OP_GET(), 3UL));
+    public void GET_equal() => Assert.Equal(new V_Bool(true), Eval(3UL, new OP_GEQ(), 3UL));
 
     [Fact]
     public void GT_true() => Assert.Equal(new V_Bool(true), Eval(3UL, new OP_GT(), 2UL));

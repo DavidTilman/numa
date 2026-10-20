@@ -88,6 +88,10 @@ In more detail:
   must be ret v. Also fixed Env.Bind, which discarded the result of SetItem.
 - E_Field: the loop that finds the field index, and merging the type checks
   into one pattern match.
+- E_UnaryNegate: wrote its Evaluate (E-NEG: negating a Nat gives an Int,
+  with overflow checks) and its tests.
+- Advised how to type number literals (Nat vs Int decided by the type
+  checker from context, defaulting to Nat).
 - Value.ValueEquals: wrote the equality helper (recursive on record fields,
   error on closures) and made OP_EQ / OP_NEQ use it.
 - Test project: explained the xUnit setup (project, reference,
@@ -105,6 +109,30 @@ In more detail:
       functions not seeing top-level variables, records, duplicate names,
       top-level Ret); these found an inverted condition in Nat subtraction,
       and Nat subtraction tests were added to E_Op.
+- S_Read: advised parsing input according to the declared type (not by
+  trying each parse in turn), and fixed the informal S-READ rule in the report
+  (store holds the value read, not the keyword; no sigma').
+- Lexer/parser: reviewed the token list (missing LAMBDA, READ, ASSIGN,
+  FAT_ARROW, EOF; no tokens for function/record types), explained recursive
+  parsing of function types, and reviewed the parser draft for bugs (token
+  consumption in ParseType, comma handling, semicolon ownership, Else).
+- Expression parser: pointed out that my first ParseExpression had no
+  precedence (every binary operator at one level, right-associative) and
+  could not reach its binary cases. Proposed and explained the layered
+  design (ParseExpression for ?:, ParseBinary by precedence climbing over a
+  precedence table, ParseUnary, ParsePostfix loop for calls and field access,
+  ParsePrimary), suggested the precedence levels, and wrote the BinOps table,
+  ParseArgs and ParsePostfix. The New keyword for record construction was my
+  idea; it confirmed it and showed where it fits (ParsePrimary).
+- Reviewed my rewritten expression parser twice for bugs (inverted ?: check,
+  unconsumed ? and ), lexemes read with Peek after Advance, False parsed as
+  True, New not consuming the record name, lambda syntax not matching the
+  grammar, pos not reset between parses).
+- Number literals: advised against storing every literal as a double and
+  re-parsing in the type checker (precision above 2^53, loses the Int/Real
+  distinction, types never change the parse); suggested integer literals as
+  Nat and real literals as Real, with Nat <= Int <= Real widening in the
+  type checker.
 - Reviewed P_Prog: closures must capture the finished global environment
   (two passes: placeholder Refs, then fill), and found the parameter
   duplicate check using the wrong set.

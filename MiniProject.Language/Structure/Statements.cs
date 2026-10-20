@@ -1,10 +1,15 @@
+using System.Globalization;
+
 namespace MiniProject.Language.Structure;
 
-abstract record Stmt
+public abstract record Outcome;
+public sealed record O_Normal : Outcome; 
+public sealed record O_Ret(Value Value) : Outcome; 
+public abstract record Stmt
 {
     public abstract (Outcome, Env) Execute(Env Env);
 }
-sealed record S_Decl(string Variable, Type Type, Expr Expr) : Stmt
+public sealed record S_Decl(string Variable, Type Type, Expr Expr) : Stmt
 {
     public override (Outcome, Env) Execute(Env Env)
     {
@@ -12,7 +17,25 @@ sealed record S_Decl(string Variable, Type Type, Expr Expr) : Stmt
     }
 }
 
-sealed record S_Assign(string Variable, Expr Expr) : Stmt
+public sealed record S_Read(string Variable, Type Type) : Stmt
+{
+    public override (Outcome, Env) Execute(Env Env)
+    {
+        Console.Write($"{Variable} := ");
+        string input = Console.ReadLine() ?? throw new Exception("No input left to read.");
+        Value v = Type switch
+        {
+            T_Nat => ulong.TryParse(input, CultureInfo.InvariantCulture, out ulong ul) ? new V_Nat(ul) : throw new Exception($"Unable to parse {Type}"),
+            T_Int => long.TryParse(input, CultureInfo.InvariantCulture, out long l) ? new V_Int(l) : throw new Exception($"Unable to parse {Type}"),
+            T_Real => double.TryParse(input, CultureInfo.InvariantCulture, out double d) ? new V_Real(d) : throw new Exception($"Unable to parse {Type}"),
+            T_Bool => bool.TryParse(input, out bool b) ? new V_Bool(b) : throw new Exception($"Unable to parse {Type}"),
+            _ => throw new Exception($"Unable to read to {Type}"),
+        };
+        return (new O_Normal(), Env.Bind(Variable, v));
+    }
+}
+
+public sealed record S_Assign(string Variable, Expr Expr) : Stmt
 {
     public override (Outcome, Env) Execute(Env Env)
     {
@@ -22,7 +45,7 @@ sealed record S_Assign(string Variable, Expr Expr) : Stmt
     }
 }
 
-sealed record S_While(Expr Cond, B_Block Body) : Stmt
+public sealed record S_While(Expr Cond, B_Block Body) : Stmt
 {
     public override (Outcome, Env) Execute(Env Env)
     {
@@ -38,7 +61,7 @@ sealed record S_While(Expr Cond, B_Block Body) : Stmt
     }
 }
 
-sealed record S_Cond(Expr Cond, B_Block OnTrue, B_Block OnFalse) : Stmt
+public sealed record S_Cond(Expr Cond, B_Block OnTrue, B_Block OnFalse) : Stmt
 {
     public override (Outcome, Env) Execute(Env Env)
     {
@@ -55,7 +78,7 @@ sealed record S_Cond(Expr Cond, B_Block OnTrue, B_Block OnFalse) : Stmt
     }
 }
 
-sealed record S_Return(Expr Expr) : Stmt
+public sealed record S_Return(Expr Expr) : Stmt
 {
     public override (Outcome, Env) Execute(Env Env)
     {
@@ -63,7 +86,7 @@ sealed record S_Return(Expr Expr) : Stmt
     }
 }
 
-sealed record S_Print(Expr Expr) : Stmt
+public sealed record S_Print(Expr Expr) : Stmt
 {
     public override (Outcome, Env) Execute(Env Env)
     {

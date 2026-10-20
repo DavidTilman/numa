@@ -1,5 +1,5 @@
 namespace MiniProject.Language.Structure;
-abstract record Value
+public abstract record Value
 {
     public static bool ValueEquals(Value V1, Value V2) => (V1, V2) switch
     {
@@ -16,42 +16,42 @@ abstract record Value
     public abstract string Show(Env env);
 }
 
-sealed record V_Placeholder : Value
+public sealed record V_Placeholder : Value
 {
     public override string Show(Env env)
     {
         throw new Exception("Congratulations! You did the impossible!");
     }
 }
-sealed record V_Nat(ulong Value) : Value
+public sealed record V_Nat(ulong Value) : Value
 {
     public override string Show(Env env)
     {
         return Value.ToString();
     }
 }
-sealed record V_Int(long Value) : Value
+public sealed record V_Int(long Value) : Value
 {
     public override string Show(Env env)
     {
         return Value.ToString();
     }
 }
-sealed record V_Real(double Value) : Value
+public sealed record V_Real(double Value) : Value
 {
     public override string Show(Env env)
     {
         return Value.ToString();
     }
 }
-sealed record V_Bool(bool Value) : Value
+public sealed record V_Bool(bool Value) : Value
 {
     public override string Show(Env env)
     {
         return Value.ToString();
     }
 }
-sealed record V_Record(string Name, IReadOnlyList<Value> Fields) : Value
+public sealed record V_Record(string Name, IReadOnlyList<Value> Fields) : Value
 {
     public override string Show(Env env) // env is not modified we just need the record table 
     {
@@ -61,7 +61,7 @@ sealed record V_Record(string Name, IReadOnlyList<Value> Fields) : Value
         return $"{Name}({field_value_string})";
     }
 }
-sealed record V_Closure(IReadOnlyList<Param> Params, B_Block Body, Env Env) : Value
+public sealed record V_Closure(IReadOnlyList<Param> Params, B_Block Body, Env Env) : Value
 {
     public override string Show(Env env)
     {
