@@ -78,6 +78,11 @@ In more detail:
       report's grammar;
     - the recursive S_While will overflow the stack on long loops;
     - records containing lists (T_Func, V_Record) compare lists by reference.
+- P_Prog: pointed out that Establish() was not idempotent (calling it from
+  the type checker and again from Execute duplicates every function), that
+  the public mutable lists broke record equality, and that Env (runtime
+  state) does not belong on the AST; suggested computed read-only Funcs,
+  Records and Stmts derived from Commands.
 
 
 3. Code
@@ -136,3 +141,39 @@ In more detail:
 - Reviewed P_Prog: closures must capture the finished global environment
   (two passes: placeholder Refs, then fill), and found the parameter
   duplicate check using the wrong set.
+
+
+4. Report: type system
+----------------------
+
+Used as a tutor and checker while I wrote the typing rules. I drafted the
+TE-/TS- rules; it corrected them and wrote TP-PROG.
+
+- Proposed the shape of the statement typing judgement: a context-threading
+  form Gamma |-_{tau_r} s -| Gamma', where only TS-DECL/TS-READ grow the
+  context and the expected return type tau_r is carried as a subscript on the
+  turnstile, plus a separate block judgement that exports no context (mirroring
+  the runtime discarding a block's inner environment).
+- Rule corrections made to my drafts:
+    - TE-LAMBDA: type the body under the context extended with the parameters,
+      and give the lambda a function type rather than its return type;
+    - TE-RECORD: added the missing result type (: R) and quantified the field
+      premise over i;
+    - TS-DECL/TS-READ/TS-ASSIGN: moved tau_r off the output context (it was
+      written as Gamma_{tau_r}) onto the turnstile where it belongs;
+    - TS-ASSIGN: the lookup premise is membership (x:tau in Gamma), not a
+      statement judgement;
+    - TS-COND: check both branches, and add the subscript and -| Gamma to the
+      conclusion.
+- Wrote TP-PROG: function signatures collected into one context so functions
+  are mutually visible, each body checked under its parameters with its
+  declared return type as tau_r, and the top-level statements checked with no
+  return type (tau_r absent) so a top-level Ret is untypable.
+- Pointed out there is no TE-APP rule although application is in the grammar,
+  and supplied one.
+- Explained design questions: that statements have no result type so the
+  judgement checks context flow and return agreement instead; that "a return
+  outside a function" falls out of tau_r being absent at the top level; and
+  that whether a function must return on every path is a separate
+  definite-return analysis, not type agreement -- left out, since E_Appl
+  already raises a clear error on fall-through.
