@@ -42,11 +42,15 @@ public class P_Prog_Tests
 
     private static Expr Op(Expr l, Operation op, Expr r) => new E_Op(l, op, r);
 
-    // Func Fact (n : Nat) : Nat = { If (n == 0) { Ret 1; } Else { Ret n * Fact(n - 1); } }
-    private static readonly Com Fact = Func("Fact", ["n"],
-        new S_Cond(Op(Var("n"), new OP_EQ(), Nat(0)),
-            new B_Block([new S_Return(Nat(1))]),
-            new B_Block([new S_Return(Op(Var("n"), new OP_Mult(), Call("Fact", Op(Var("n"), new OP_Sub(), Nat(1)))))])));
+    // Func Fact (n : Int) : Int = { If (n == 0) { Ret 1; } Else { Ret n * Fact(n - 1); } }
+    // n is Int, not Nat: n - 1 has type Int, so it cannot flow back into a Nat parameter.
+    private static readonly Com Fact = new C_Decl(new D_Func("Fact",
+        [new Param("n", new T_Int())], new T_Int(),
+        new B_Block([
+            new S_Cond(Op(Var("n"), new OP_EQ(), Nat(0)),
+                new B_Block([new S_Return(Nat(1))]),
+                new B_Block([new S_Return(Op(Var("n"), new OP_Mult(), Call("Fact", Op(Var("n"), new OP_Sub(), Nat(1)))))]))
+        ])));
 
     [Fact]
     public void Empty_program_runs()
@@ -87,16 +91,22 @@ public class P_Prog_Tests
     [Fact]
     public void Mutual_recursion_in_either_order()
     {
-        // Func IsEven (n) = { If (n == 0) { Ret True; } Else { Ret IsOdd(n - 1); } }
-        // Func IsOdd (n)  = { If (n == 0) { Ret False; } Else { Ret IsEven(n - 1); } }
-        Com isEven = Func("IsEven", ["n"],
-            new S_Cond(Op(Var("n"), new OP_EQ(), Nat(0)),
-                new B_Block([new S_Return(new E_Lit(true))]),
-                new B_Block([new S_Return(Call("IsOdd", Op(Var("n"), new OP_Sub(), Nat(1))))])));
-        Com isOdd = Func("IsOdd", ["n"],
-            new S_Cond(Op(Var("n"), new OP_EQ(), Nat(0)),
-                new B_Block([new S_Return(new E_Lit(false))]),
-                new B_Block([new S_Return(Call("IsEven", Op(Var("n"), new OP_Sub(), Nat(1))))])));
+        // Func IsEven (n : Int) : Bool = { If (n == 0) { Ret True; } Else { Ret IsOdd(n - 1); } }
+        // Func IsOdd (n : Int)  : Bool = { If (n == 0) { Ret False; } Else { Ret IsEven(n - 1); } }
+        Com isEven = new C_Decl(new D_Func("IsEven",
+            [new Param("n", new T_Int())], new T_Bool(),
+            new B_Block([
+                new S_Cond(Op(Var("n"), new OP_EQ(), Nat(0)),
+                    new B_Block([new S_Return(new E_Lit(true))]),
+                    new B_Block([new S_Return(Call("IsOdd", Op(Var("n"), new OP_Sub(), Nat(1))))]))
+            ])));
+        Com isOdd = new C_Decl(new D_Func("IsOdd",
+            [new Param("n", new T_Int())], new T_Bool(),
+            new B_Block([
+                new S_Cond(Op(Var("n"), new OP_EQ(), Nat(0)),
+                    new B_Block([new S_Return(new E_Lit(false))]),
+                    new B_Block([new S_Return(Call("IsEven", Op(Var("n"), new OP_Sub(), Nat(1))))]))
+            ])));
 
         Assert.Equal(["True", "False"], Run(isEven, isOdd, Do(Print(Call("IsEven", Nat(4)))), Do(Print(Call("IsOdd", Nat(4))))));
     }

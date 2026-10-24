@@ -18,10 +18,10 @@ public class E_Op_Tests
     public void Sub_int_can_go_negative() => Assert.Equal(new V_Int(-3), Eval(2L, new OP_Sub(), 5L));
 
     [Fact]
-    public void Sub_nat() => Assert.Equal(new V_Nat(2), Eval(5UL, new OP_Sub(), 3UL));
+    public void Sub_nat_gives_int() => Assert.Equal(new V_Int(2), Eval(5UL, new OP_Sub(), 3UL));
 
     [Fact]
-    public void Sub_nat_below_zero_gives_zero() => Assert.Equal(new V_Nat(0), Eval(2UL, new OP_Sub(), 5UL));
+    public void Sub_nat_can_go_negative() => Assert.Equal(new V_Int(-3), Eval(2UL, new OP_Sub(), 5UL));
 
     [Fact]
     public void Mult_nat() => Assert.Equal(new V_Nat(6), Eval(2UL, new OP_Mult(), 3UL));
@@ -31,6 +31,34 @@ public class E_Op_Tests
 
     [Fact]
     public void Mod_nat() => Assert.Equal(new V_Nat(1), Eval(7UL, new OP_Mod(), 2UL));
+
+    // Mixed numeric operands coerce to the wider type (Nat <= Int <= Real).
+    [Fact]
+    public void Plus_nat_int_gives_int() => Assert.Equal(new V_Int(5), Eval(2UL, new OP_Plus(), 3L));
+
+    [Fact]
+    public void Plus_int_nat_gives_int() => Assert.Equal(new V_Int(5), Eval(2L, new OP_Plus(), 3UL));
+
+    [Fact]
+    public void Plus_nat_real_gives_real() => Assert.Equal(new V_Real(3.5), Eval(2UL, new OP_Plus(), 1.5));
+
+    [Fact]
+    public void Plus_int_real_gives_real() => Assert.Equal(new V_Real(3.5), Eval(2L, new OP_Plus(), 1.5));
+
+    [Fact]
+    public void Sub_nat_int_gives_int() => Assert.Equal(new V_Int(3), Eval(5UL, new OP_Sub(), 2L));
+
+    [Fact]
+    public void LT_nat_int() => Assert.Equal(new V_Bool(true), Eval(2UL, new OP_LT(), 3L));
+
+    [Fact]
+    public void EQ_int_nat_equal() => Assert.Equal(new V_Bool(true), Eval(2L, new OP_EQ(), 2UL));
+
+    [Fact]
+    public void EQ_int_nat_unequal() => Assert.Equal(new V_Bool(false), Eval(2L, new OP_EQ(), 3UL));
+
+    [Fact]
+    public void EQ_nat_real_equal() => Assert.Equal(new V_Bool(true), Eval(2UL, new OP_EQ(), 2.0));
 
     [Fact]
     public void LT_true() => Assert.Equal(new V_Bool(true), Eval(2UL, new OP_LT(), 3UL));

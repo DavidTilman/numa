@@ -72,8 +72,13 @@ In more detail:
   environment; blocks discard the returned environment (scoping).
 - Types are erased at run time: S_Decl, E_Lambda and Param keep their types for
   the type checker only; runtime type checks are not part of the rules.
+- Nat subtraction: originally flagged that it wraps around in C# and that the
+  first fix (flooring at zero) silently produces a wrong answer; worked through
+  the options and settled on Nat - Nat = Int (total and honest, consistent with
+  unary negation widening Nat to Int). Noted the knock-on effects: idiomatic Nat
+  recursion (factorial counting down) no longer type-checks, and the runtime had
+  no coercion between numeric tags.
 - Pointed out issues to decide or document:
-    - Nat subtraction wraps around in C# (choose error or floor at zero);
     - && and || are strict, not short-circuiting, and are missing from the
       report's grammar;
     - the recursive S_While will overflow the stack on long loops;
@@ -141,6 +146,14 @@ In more detail:
 - Reviewed P_Prog: closures must capture the finished global environment
   (two passes: placeholder Refs, then fill), and found the parameter
   duplicate check using the wrong set.
+- Numeric coercion: wrote the widening helper (Coerce/Rank/Promote on
+  Operation, Nat <= Int <= Real) and added it to every numeric operator and to
+  ValueEquals, so mixed-tag operands (e.g. Nat + Int, Int == Nat) promote to the
+  wider type instead of throwing. This matches the type checker's widest/sig and
+  fixed the recursive P_Prog tests, which broke once Nat - Nat became Int.
+  Updated the subtraction tests, and added mixed-tag tests to E_Op (Nat+Int,
+  Nat+Real, Int+Real, Nat-Int, Nat<Int, Int==Nat, Nat==Real). Noted the lossy
+  casts (ulong->long, and ->double above 2^53) as a documented limitation.
 
 
 4. Report: type system
@@ -177,3 +190,34 @@ TE-/TS- rules; it corrected them and wrote TP-PROG.
   that whether a function must return on every path is a separate
   definite-return analysis, not type agreement -- left out, since E_Appl
   already raises a clear error on fall-through.
+
+
+5. Code: type-checker exceptions and tests
+-------------------------------------------
+
+- Reviewed TypeChecker.cs: confirmed the type rules (Widest, Sig, Assignable,
+  SameType) and flagged two bugs where the immutable Context's updated copy was
+  discarded -- CheckBlock not threading the per-statement context, and
+  CheckProgram not rebinding parameters; I fixed both.
+- After the typed exception classes were added, wired the specific exceptions
+  through TypeChecker in place of the empty TypeException("") throws
+  (UnBound/UndefinedType/InvalidCall/UnexpectedType/TypeMismatch/
+  NotWellTyped/UndefinedUnaryNegation/Internal). Changed FieldType to take the
+  E_Field node so a non-record target reports NotWellTypedException, and split
+  S_Return into CheckReturn so a top-level return (no tau_r) is distinguished
+  from a wrong return type.
+- Wrote the type-checker test suite (126 tests) from the intended semantics,
+  driven only through TypeChecker(P_Prog).Check(): a shared TC helper, then one
+  file each for operator typing, assignability, expressions, statements and
+  whole programs. Expression types are pinned via the return type that accepts
+  them (e.g. Nat-Nat must be Int, not Nat; comparisons give Bool).
+- Noted but did not test as a failure: S_Decl ignores its type annotation (it
+  binds the variable to the initialiser's inferred type), which is inconsistent
+  with S_Read and the Assignable checks elsewhere.
+- Wrote the parser test suite (77 tests), feeding the parser exact token lists
+  (there is no lexer) and inspecting the AST: a shared PT helper, then files for
+  expressions (precedence, associativity, unary, ternary, grouping, postfix
+  application/field, New, Lambda), statements, declarations/types (including
+  function types), program structure, and malformed streams. Used Assert.Equal
+  on list-free nodes and piecewise checks where a node holds a list (which
+  C# records compare by reference).

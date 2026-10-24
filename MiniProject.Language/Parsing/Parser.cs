@@ -1,5 +1,9 @@
 using MiniProject.Language.Structure;
 using MiniProject.Language.Lexing;
+using static MiniProject.Language.Lexing.TokenType;
+using Type = MiniProject.Language.Structure.Type;
+using MiniProject.Language.Exceptions;
+
 namespace MiniProject.Language.Parsing;
 
 public class Parser
@@ -12,53 +16,53 @@ public class Parser
     Token Expect(TokenType t)
     {
         if (!Check(t))
-            throw new Exception($"Expected {t} but found '{Peek().Lexeme}' (token {pos})");
+            throw new UnexpectedTokenException(t,Peek().Type,pos);
         return Advance();
     }
 
     static readonly Dictionary<TokenType, (int Prec, Operation Op)> BinOps = new()
     {
-        [TokenType.OR]   = (1, new OP_OR()),
-        [TokenType.AND]  = (2, new OP_AND()),
-        [TokenType.EQ]   = (3, new OP_EQ()),   [TokenType.NEQ] = (3, new OP_NEQ()),
-        [TokenType.LT]   = (4, new OP_LT()),   [TokenType.LEQ] = (4, new OP_LEQ()),
-        [TokenType.GT]   = (4, new OP_GT()),   [TokenType.GEQ] = (4, new OP_GEQ()),
-        [TokenType.PLUS] = (5, new OP_Plus()), [TokenType.SUB] = (5, new OP_Sub()),
-        [TokenType.MULT] = (6, new OP_Mult()), [TokenType.DIV] = (6, new OP_Div()),
-        [TokenType.MOD]  = (6, new OP_Mod()),
+        [OR]   = (1, new OP_OR()),
+        [AND]  = (2, new OP_AND()),
+        [EQ]   = (3, new OP_EQ()),   [NEQ] = (3, new OP_NEQ()),
+        [LT]   = (4, new OP_LT()),   [LEQ] = (4, new OP_LEQ()),
+        [GT]   = (4, new OP_GT()),   [GEQ] = (4, new OP_GEQ()),
+        [PLUS] = (5, new OP_Plus()), [SUB] = (5, new OP_Sub()),
+        [MULT] = (6, new OP_Mult()), [DIV] = (6, new OP_Div()),
+        [MOD]  = (6, new OP_Mod()),
     };
 
     #region Args & Params
     private List<Expr> ParseArgs()
     {
-        Expect(TokenType.L_PAREN);
+        Expect(L_PAREN);
         List<Expr> args = [];
-        while (!Check(TokenType.R_PAREN))
+        while (!Check(R_PAREN))
         {
             args.Add(ParseExpression());
-            if (!Check(TokenType.COMMA)) break;
+            if (!Check(COMMA)) break;
             Advance();
         }
-        Expect(TokenType.R_PAREN);
+        Expect(R_PAREN);
         return args;
     }
 
     private Param ParseParam()
     {
-        Token ident = Expect(TokenType.IDENT);
-        Expect(TokenType.COLON);
-        Structure.Type t = ParseType();
+        Token ident = Expect(IDENT);
+        Expect(COLON);
+        Type t = ParseType();
         return new Param(ident.Lexeme!, t);
     }
 
     private List<Param> ParseParams()
     {
         List<Param> _params = [];
-        while(!Check(TokenType.R_PAREN))
+        while(!Check(R_PAREN))
         {
             Param p = ParseParam();
             _params.Add(p);
-            if(Check(TokenType.COMMA))
+            if(Check(COMMA))
             {
                 Advance();
             } else {break;}
@@ -73,10 +77,10 @@ public class Parser
         this.Tokens = tokens;
         this.pos = 0;
         List<Com> commands = [];
-        while(!Check(TokenType.EOF))
+        while(!Check(EOF))
         {
             commands.Add(ParseCommand()); 
-            Expect(TokenType.SEMICOLON);
+            Expect(SEMICOLON);
         }
         return new P_Prog(commands);
     }
@@ -86,15 +90,15 @@ public class Parser
     #region Commands
     private Com ParseCommand()
     {
-        if (Check(TokenType.RECORD) || Check(TokenType.FUNC)) return ParseDeclaration();
+        if (Check(RECORD) || Check(FUNC)) return ParseDeclaration();
         return ParseCStatement();
     }
 
     private C_Decl ParseDeclaration()
     {
-        if (Check(TokenType.RECORD)) return new C_Decl(ParseRecordDeclaration());
-        if (Check(TokenType.FUNC)) return new C_Decl(ParseFuncDeclaration());
-        throw new Exception($"Attempted to parse {Peek().Type} as declaration.");
+        if (Check(RECORD)) return new C_Decl(ParseRecordDeclaration());
+        if (Check(FUNC)) return new C_Decl(ParseFuncDeclaration());
+        throw new InvalidParseException(Peek().Type.GetType(), typeof(C_Decl));
     }
 
     private C_Stmt ParseCStatement()
@@ -106,53 +110,53 @@ public class Parser
     #region Declarations
     private D_Record ParseRecordDeclaration()
     {
-        Expect(TokenType.RECORD);
-        Token ident = Expect(TokenType.IDENT);
-        Expect(TokenType.L_PAREN);
+        Expect(RECORD);
+        Token ident = Expect(IDENT);
+        Expect(L_PAREN);
         List<Param> _params = ParseParams();
-        Expect(TokenType.R_PAREN);
+        Expect(R_PAREN);
 
         return new D_Record(ident.Lexeme!, _params);
     }
 
     private D_Func ParseFuncDeclaration()
     {
-        Expect(TokenType.FUNC);
-        Token ident = Expect(TokenType.IDENT);
-        Expect(TokenType.L_PAREN);
+        Expect(FUNC);
+        Token ident = Expect(IDENT);
+        Expect(L_PAREN);
         List<Param> _params = ParseParams();
-        Expect(TokenType.R_PAREN);
-        Expect(TokenType.COLON);
-        Structure.Type t = ParseType();
-        Expect(TokenType.EQUALS);
+        Expect(R_PAREN);
+        Expect(COLON);
+        Type t = ParseType();
+        Expect(EQUALS);
         B_Block body = ParseBlock();
         return new D_Func(ident.Lexeme!, _params, t, body);
     }
     #endregion
 
     #region Type
-    private Structure.Type ParseType()
+    private Type ParseType()
     {
-        Structure.Type t;
+        Type t;
         Token tok = Advance();
         switch(tok.Type)
         {
-            case (TokenType.NAT_TYPE):
+            case (NAT_TYPE):
                 t = new T_Nat(); break;
-            case (TokenType.INT_TYPE):
+            case (INT_TYPE):
                 t = new T_Int(); break;
-            case (TokenType.REAL_TYPE):
+            case (REAL_TYPE):
                 t = new T_Real(); break;
-            case (TokenType.BOOL_TYPE):
+            case (BOOL_TYPE):
                 t = new T_Bool(); break;
-            case (TokenType.IDENT):
+            case (IDENT):
                 t = new T_Record(tok.Lexeme!); break;
-            case (TokenType.L_PAREN):
-                List<Structure.Type> types = [];
-                while (!Check(TokenType.R_PAREN))
+            case (L_PAREN):
+                List<Type> types = [];
+                while (!Check(R_PAREN))
                 {
                     types.Add(ParseType());
-                    if (Check(TokenType.COMMA))
+                    if (Check(COMMA))
                     {
                         Advance();
                     } 
@@ -161,12 +165,12 @@ public class Parser
                         break;   
                     }
                 } 
-                Expect(TokenType.R_PAREN);
-                Expect(TokenType.ARROW);
+                Expect(R_PAREN);
+                Expect(ARROW);
                 t = new T_Func(types, ParseType());
                 break;
             default:
-                throw new Exception($"Attempted to parse {tok.Type} as type.");
+                        throw new InvalidParseException(tok.Type.GetType(), typeof(Type));
         }
 
         return t;
@@ -176,14 +180,14 @@ public class Parser
     #region Block
     private B_Block ParseBlock()
     {
-        Expect(TokenType.L_BRACE);
+        Expect(L_BRACE);
         List<Stmt> stmts = [];
-        while (!Check(TokenType.R_BRACE))
+        while (!Check(R_BRACE))
         {
             stmts.Add(ParseSStatement());
-            Expect(TokenType.SEMICOLON);
+            Expect(SEMICOLON);
         }
-        Expect(TokenType.R_BRACE);
+        Expect(R_BRACE);
         return new B_Block(stmts);
     }
     #endregion
@@ -191,14 +195,14 @@ public class Parser
     #region Statement
     private Stmt ParseSStatement()
     {
-        if(Check(TokenType.VAR))
+        if(Check(VAR))
         {
-            Expect(TokenType.VAR);
-            Token ident = Expect(TokenType.IDENT);
-            Expect(TokenType.COLON);
-            Structure.Type t = ParseType(); 
-            Expect(TokenType.EQUALS);
-            if (Check(TokenType.READ))
+            Expect(VAR);
+            Token ident = Expect(IDENT);
+            Expect(COLON);
+            Type t = ParseType(); 
+            Expect(EQUALS);
+            if (Check(READ))
             {
                 Advance();
                 return new S_Read(ident.Lexeme!, t);
@@ -210,35 +214,35 @@ public class Parser
             }
         }
 
-        if (Check(TokenType.IDENT))
+        if (Check(IDENT))
         {
-            Token ident = Expect(TokenType.IDENT);
-            Expect(TokenType.ASSIGN);
+            Token ident = Expect(IDENT);
+            Expect(ASSIGN);
             Expr e = ParseExpression();
             return new S_Assign(ident.Lexeme!, e);
         }
 
-        if (Check(TokenType.WHILE))
+        if (Check(WHILE))
         {
-            Expect(TokenType.WHILE);
-            Expect(TokenType.L_PAREN);
+            Expect(WHILE);
+            Expect(L_PAREN);
             Expr e = ParseExpression();
-            Expect(TokenType.R_PAREN);
+            Expect(R_PAREN);
             B_Block b = ParseBlock();
             return new S_While(e, b);
         }
 
-        if (Check(TokenType.IF))
+        if (Check(IF))
         {
-            Expect(TokenType.IF);
-            Expect(TokenType.L_PAREN);
+            Expect(IF);
+            Expect(L_PAREN);
             Expr e = ParseExpression();
-            Expect(TokenType.R_PAREN);
+            Expect(R_PAREN);
             B_Block b1 = ParseBlock();
             B_Block b2;
-            if (Check(TokenType.ELSE))
+            if (Check(ELSE))
             {
-                Expect(TokenType.ELSE);
+                Expect(ELSE);
                 b2 = ParseBlock();
             } else
             {
@@ -247,21 +251,21 @@ public class Parser
             return new S_Cond(e, b1, b2);
         }
 
-        if (Check(TokenType.RET))
+        if (Check(RET))
         {
-            Expect(TokenType.RET);
+            Expect(RET);
             Expr e = ParseExpression();
             return new S_Return(e);
         }
 
-        if (Check(TokenType.PRINT))
+        if (Check(PRINT))
         {
-            Expect(TokenType.PRINT);
+            Expect(PRINT);
             Expr e = ParseExpression();
             return new S_Print(e);
         }
 
-        throw new Exception($"Unexpected {Peek().Type} at start of statement.");
+        throw new UnexpectedStartException(Peek().Type, "expression", pos);
     }
     #endregion
 
@@ -277,10 +281,10 @@ public class Parser
     private Expr ParseExpression()
     {
         Expr left = ParseBinary();
-        if (!Check(TokenType.QUESTION)) return left;
-        Expect(TokenType.QUESTION);
+        if (!Check(QUESTION)) return left;
+        Expect(QUESTION);
         Expr e1 = ParseExpression();
-        Expect(TokenType.COLON);
+        Expect(COLON);
         Expr e2 = ParseExpression();
         return new E_Cond(left, e1, e2);
     }
@@ -300,7 +304,7 @@ public class Parser
 
     private Expr ParseUnary()
     {
-        if (Check(TokenType.SUB))
+        if (Check(SUB))
         {
             Advance();
             return new E_UnaryNegate(ParseUnary());
@@ -313,12 +317,12 @@ public class Parser
         Expr e = ParsePrimary();
         while (true)
         {
-            if (Check(TokenType.L_PAREN))
+            if (Check(L_PAREN))
                 e = new E_Appl(e, ParseArgs());
-            else if (Check(TokenType.DOT))
+            else if (Check(DOT))
             {
                 Advance();
-                e = new E_Field(e, Expect(TokenType.IDENT).Lexeme!);
+                e = new E_Field(e, Expect(IDENT).Lexeme!);
             }
             else return e;
         }
@@ -329,33 +333,33 @@ public class Parser
         Token tok = Advance();
         switch (tok.Type)
         {
-            case TokenType.INT_LIT:
+            case INT_LIT:
                 return new E_Lit(ulong.Parse(tok.Lexeme!));
-            case TokenType.REAL_LIT:
+            case REAL_LIT:
                 return new E_Lit(double.Parse(tok.Lexeme!));
-            case TokenType.TRUE_LIT:
+            case TRUE_LIT:
                 return new E_Lit(true);
-            case TokenType.FALSE_LIT:
+            case FALSE_LIT:
                 return new E_Lit(false);
-            case TokenType.IDENT:
+            case IDENT:
                 return new E_Var(tok.Lexeme!);
-            case TokenType.L_PAREN:
+            case L_PAREN:
                 Expr e = ParseExpression();
-                Expect(TokenType.R_PAREN);
+                Expect(R_PAREN);
                 return e;
-            case TokenType.NEW:
-                string name = Expect(TokenType.IDENT).Lexeme!;
+            case NEW:
+                string name = Expect(IDENT).Lexeme!;
                 return new E_RecCon(name, ParseArgs());
-            case TokenType.LAMBDA:
-                Expect(TokenType.L_PAREN);
+            case LAMBDA:
+                Expect(L_PAREN);
                 var _params = ParseParams();
-                Expect(TokenType.R_PAREN);
-                Expect(TokenType.COLON);
+                Expect(R_PAREN);
+                Expect(COLON);
                 var retType = ParseType();
-                Expect(TokenType.FAT_ARROW);
+                Expect(FAT_ARROW);
                 return new E_Lambda(_params, retType, ParseExpression());
             default:
-                throw new Exception($"Unexpected {tok.Type} while parsing primary.");
+                throw new UnexpectedStartException(tok.Type, "primary",pos);
         }
     }
     #endregion

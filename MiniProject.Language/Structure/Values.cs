@@ -1,7 +1,7 @@
 namespace MiniProject.Language.Structure;
 public abstract record Value
 {
-    public static bool ValueEquals(Value V1, Value V2) => (V1, V2) switch
+    public static bool ValueEquals(Value V1, Value V2) => (Operation.Coerce(V1, V2)) switch
     {
         (V_Nat a, V_Nat b) => a.Value == b.Value,
         (V_Int a, V_Int b) => a.Value == b.Value,
