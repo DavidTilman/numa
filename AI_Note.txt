@@ -221,3 +221,42 @@ TE-/TS- rules; it corrected them and wrote TP-PROG.
   function types), program structure, and malformed streams. Used Assert.Equal
   on list-free nodes and piecewise checks where a node holds a list (which
   C# records compare by reference).
+
+
+6. Code: lexer review and tests
+-------------------------------
+
+- Reviewed Lexer.cs against the parser's expectations and fixed four bugs:
+  '%' mapped to DIV (should be MOD), '<' to LEQ (should be LT) and '>' to GEQ
+  (should be GT); and the shared scratchpad StringBuilder was not reset after
+  the double-/single-symbol branches, so a symbol token left stale characters
+  that corrupted the next token (e.g. "a := b" emitted a phantom COLON). Added
+  a scratchpad.Clear() at the top of each lex iteration.
+- Added the missing "Bool" keyword (the parser accepts Bool as a type, but
+  without it Bool lexed as an identifier -> T_Record), and made Lex append an
+  EOF token so its output is directly consumable by the parser, which loops on
+  while(!Check(EOF)). Also unswapped the misnamed singleT/doubleT locals.
+- Wrote the lexer test suite (61 tests): single symbols, double symbols with
+  maximal-munch checks, int/real literals, keywords vs identifiers (case
+  sensitivity), whitespace handling, EOF termination, the scratchpad-leak
+  regressions, a representative statement, and unknown-character errors.
+
+
+7. Example programs
+-------------------
+
+- Wrote seven example programs in example_programs/ that together exercise the
+  whole language: arithmetic (numeric widening Nat<:Int<:Real, + - * / %, unary
+  negate), conditionals (&&/||, comparisons, ternary, If/Else), loops (While +
+  assignment), recursion (fact/fib), mutual recursion (isEven/isOdd),
+  higher-order functions (Lambda, function-typed params, a function returning a
+  function, closures) and records (declaration, New, nested field access, ==),
+  plus an interactive io.mpl using Read. Added a README table.
+- Verified each by lexing -> parsing -> type-checking, and executing all the
+  non-interactive ones (captured output matches: 120/55, closures 201, record
+  structural equality True, etc.).
+- Chose the examples around two real constraints of the current implementation:
+  the lexer has no comment syntax (so the files carry none), and S_Decl binds a
+  variable at the inferred type of its initialiser rather than its annotation,
+  so counters/parameters are typed to stay Assignable (e.g. recursion uses Int
+  params because Nat - Nat widens to Int).
