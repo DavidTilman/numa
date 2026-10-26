@@ -484,3 +484,4 @@ $RECYCLE.BIN/
 # LaTeX report: only the compiled PDF is tracked, sources stay local
 report/*
 !report/report.pdf
+!report/report.tex
