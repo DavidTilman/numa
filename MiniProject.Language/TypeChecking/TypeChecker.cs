@@ -4,17 +4,17 @@ using MiniProject.Language.Exceptions;
 using Type = MiniProject.Language.Structure.Type;
 namespace MiniProject.Language.TypeChecking;
 
-public sealed record Context(ImmutableDictionary<string, Type> Vars)
-{
+public sealed record Context(ImmutableDictionary<string, Type> Vars) {
     public Type Lookup(string name)
-        => Vars.TryGetValue(name, out Type? t) ? t : throw new UnBoundVarException(name);
+        => Vars.TryGetValue(name, out Type? t) 
+            ? t 
+            : throw new UnBoundVarException(name);
 
     public Context Bind(string name, Type type)
         => this with { Vars = Vars.SetItem(name, type) };
 }
 
-public class TypeChecker
-{
+public class TypeChecker {
     static Type? Neg(Type t) => t switch {
         T_Nat  => new T_Int(),
         T_Int  => new T_Int(),
