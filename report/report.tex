@@ -1,0 +1,762 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{mathpartir}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[backend=biber,style=numeric]{biblatex}
+\usepackage[hidelinks]{hyperref}
+
+\addbibresource{references.bib}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries,
+  morekeywords={Record,Func,Print,Lambda,Var,While,If,Else,Ret,Nat,Int,Real,Bool,True,False},
+  columns=fullflexible,
+  frame=single,
+}
+
+\lstdefinelanguage{CSharp}[Sharp]{C}{
+	morekeywords={record, var, init, when, with, is, not, and, or, required, async, await, nameof, dynamic},
+}
+
+% --- Front matter details -------------------------------------------------
+\newcommand{\langname}{LanguageName}            % TODO: name of the language
+\newcommand{\studentid}{2763839}                % TODO: student ID
+\newcommand{\giturl}{https://github.com/DavidTilman/plpdi-mini-project}
+\newcommand{\githash}{TODO}                     % TODO: commit hash of submitted code
+
+% --- Semantics notation ---------------------------------------------------
+\newcommand{\kw}[1]{\mathtt{#1}}                     % keyword / concrete syntax
+\newcommand{\step}{\longrightarrow}                  % small-step reduction
+\newcommand{\eval}{\Downarrow}                       % big-step evaluation
+\newcommand{\config}[1]{\langle #1 \rangle}    % configuration <e, sigma>
+\newcommand{\judge}[3]{#1 \vdash #2 : #3}            % typing judgement
+\newcommand {\csharp}{\texttt{C\#\ }}
+\newcommand{\clo}[3]{\mathsf{clo}(#1,\, #2,\, #3)}
+\newcommand{\rn}[1]{\TirNameStyle{#1}}
+\title{\langname: PLPDI Mini-Project}
+\author{David Tilman \\ Student ID: \studentid}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+  \begin{tabular}{rl}
+    Repository: & \url{\giturl} \\
+    Commit:     & \texttt{\githash}
+  \end{tabular}
+\end{center}
+
+% ==========================================================================
+\section{Informal Description}
+% 1--2 paragraphs: what the language is, who it is for, its key features.
+
+
+% ==========================================================================
+\section{Literature Review}
+% [Extended] 2--3 paragraphs situating the language among existing work.
+% Cite with \cite{key}; entries live in references.bib, e.g. \cite{pierce2002types}.
+
+% ==========================================================================
+\section{Formal Syntax and Semantics}
+
+\subsection{Syntax}
+% Abstract syntax in BNF.
+
+\[
+\begin{array}{rcll}
+  \oplus & ::=  & \kw{+} \mid \kw{-} \mid \kw{*} \mid \kw{/} \mid \kw{\%}
+                  \mid \kw{<} \mid \kw{<=} \mid \kw{==} \mid \kw{!=} \mid \kw{>=} \mid \kw{>} 
+                  \mid \kw{||} \mid \kw{\&\&}
+                & \text{binary operators} \\[4pt]
+  \tau   & ::=  & \kw{Nat} \mid \kw{Int} \mid \kw{Real} \mid \kw{Bool}  & \text{base types} \\
+         & \mid & (\tau_1, \dots, \tau_n) \to \tau        & \text{function type} \\
+         & \mid & R                                       & \text{record type} \\[4pt]
+         & \mid & [\tau]                                  & \text{list} \\[4pt]
+  e      & ::=  & n                                       & \text{literal} \\
+         & \mid & \kw{True} \mid \kw{False}               & \text{bool literal} \\
+         & \mid & x                                       & \text{variable} \\
+         & \mid & -e                                      & \text{unary negation} \\
+         & \mid & e_1 \oplus e_2                          & \text{binary operation} \\
+         & \mid & e.f                                     & \text{field access} \\
+         & \mid & e(e_1, \dots, e_n)                      & \text{application} \\
+         & \mid & \kw{New}\ R(e_1, \dots, e_n)                  & \text{record construction} \\
+         & \mid & \kw{Lambda}\ (x_1 : \tau_1, \dots, x_n : \tau_n) : \tau \Rightarrow e
+                                                          & \text{lambda} \\
+         & \mid & e\ ?\ e_1 : e_2                         & \text{if expression} \\[4pt]
+  b      & ::=  & \{\, s_1;\ \dots;\ s_n; \,\}            & \text{block } (n \ge 0) \\[4pt]
+  s      & ::=  & \kw{Var}\ x : \tau = e                  & \text{declaration} \\
+ 		 & \mid & \kw{Var}\ x : \tau = \kw{Read} & \text{declaration from input} \\
+         & \mid & x := e                                  & \text{assignment} \\
+         & \mid & \kw{While}\ (e)\ b                      & \text{loop} \\
+         & \mid & \kw{If}\ (e)\ b                         & \text{conditional} \\
+         & \mid & \kw{If}\ (e)\ b_1\ \kw{Else}\ b_2       & \text{conditional with else} \\
+         & \mid & \kw{Ret}\ e                             & \text{return} \\
+         & \mid & \kw{Print}\ e                           & \text{print} \\[4pt]
+  d      & ::=  & \kw{Record}\ R\ (f_1 : \tau_1, \dots, f_n : \tau_n)
+                                                          & \text{record declaration} \\
+         & \mid & \kw{Func}\ F\ (x_1 : \tau_1, \dots, x_n : \tau_n) : \tau = b
+                                                          & \text{function declaration} \\[4pt]
+  c      & ::=  & d \mid s                                & \text{top-level item} \\
+  p      & ::=  & c_1;\ \dots;\ c_n;                      & \text{program}
+\end{array}
+\]
+
+$\kw{If}\ (e)\ b$ abbreviates $\kw{If}\ (e)\ b\ \kw{Else}\ \{\,\}$.
+Binary operations $\kw{\&\&}$, $\kw{||}$, are strict. They always evaluate both expressions.
+
+\subsection{Type System}
+\subsubsection{Notation}
+We define 3 functions:
+\begin{itemize}
+	\item $\mathsf{neg}(\tau)\triangleq \text{the resulting type when $\tau$ is negated}$:
+	
+	$$
+	\begin{array}{rcl}
+	\kw{Nat} & \mapsto & \kw{Int} \\
+	\kw{Int} & \mapsto & \kw{Int} \\
+	\kw{Real} & \mapsto & \kw{Real}
+	\end{array}
+	$$
+	\item $\mathsf{sig}(\oplus, \tau_1, \tau_2)\triangleq \text{the resulting type when $\oplus$ is applied to $\tau_1,\tau_2$}$.
+	
+	It is a partial function: $\mathsf{sig}(==, \kw{true}, \kw{3})$ is undefined. Where it is, the operation is not well-formed.
+	
+	\item $\mathsf{widest}(\tau_1, \tau_2)\triangleq \text{the type with the larger domain}$: $\kw{Nat}\leq\kw{Int}\leq\kw{Real}$. Widest is only defined for the three number types.
+\end{itemize}
+
+\subsubsection{Expression typing}
+\begin{mathpar}
+  	\inferrule*[right=TE-NUM]
+  	{ }
+  	{\Gamma\vdash n : \kw{Nat\ |\ Real}} 
+  	\and
+  	\inferrule*[right=TE-TRUE]
+  	{ }
+  	{\Gamma\vdash \kw{True} : \kw{Bool}}
+  	\and
+  	\inferrule*[right=TE-FALSE]
+  	{ }
+  	{\Gamma\vdash \kw{False} : \kw{Bool}}
+  	\and
+  	\inferrule*[right=TE-VAR]
+  	{x : \tau \in \Gamma}
+  	{\Gamma\vdash x : \tau}
+  	\and
+  	\inferrule*[right=TE-NEGATE]
+  	{\Gamma\vdash e : \tau \\ \mathsf{neg}(\tau) = \tau'}
+  	{\Gamma\vdash -e : \tau'} 
+  	\and
+  	\inferrule*[right=TE-OP]
+  	{\Gamma\vdash e_1 : \tau_1 \\ \Gamma\vdash e_2 : \tau_2 \\ \mathsf{sig(\oplus, \tau_1, \tau_2) = \tau}}
+  	{\Gamma\vdash e_1 \oplus e_2 : \tau}
+  	\and
+  	\inferrule*[right=TE-FIELD]
+  	{\Gamma\vdash e : R \\ \Delta(R)=(f_1:\tau_1, \ldots, f_n:\tau_n) \\ f=f_i}
+  	{\Gamma \vdash e.f : \tau_i} 
+  	\and
+  	\inferrule*[right=TE-APP]
+  	{ \Gamma \vdash e : (\tau_1, \ldots, \tau_n) \to \tau \\ \Gamma \vdash e_i : \tau_i \quad (1 \le i \le n) }
+  	{ \Gamma \vdash e(e_1, \ldots, e_n) : \tau }
+  	\and
+  	\inferrule*[right=TE-RECORD]
+  	{ \Delta(R)=(f_1:\tau_1, \ldots, f_n:\tau_n) \\ \Gamma\vdash e_i:\tau_i}
+  	{ \Gamma\vdash \kw{New}\ R(e_1,\ldots,e_n):R}
+  	\and
+  	\inferrule*[right=TE-LAMBDA]
+  	{\Gamma, x_1:\tau_1, \ldots, x_n:\tau_n \vdash e : \tau}
+  	{\Gamma \vdash \kw{Lambda}\,(x_1:\tau_1, \ldots, x_n:\tau_n):\tau \Rightarrow e : (\tau_1, \ldots, \tau_n) \to \tau}
+  	\and
+  	\inferrule*[right=TE-COND]
+  	{ \Gamma \vdash e : \kw{Bool} \\ \Gamma \vdash e_1: \tau_1 \\ \Gamma \vdash e_2: \tau_2 \\ \tau = \mathsf{widest}(\tau_1, \tau_2)}
+  	{\Gamma\vdash (e\ ?\ e_1\ :\ e_2) : \tau}
+\end{mathpar}
+
+% Expression typing explainer here.
+\rn{TE-NUM}, \rn{TE-TRUE}, \rn{TE-FALSE} are trivial, except possibly for the omission of an \rn{TE-INT} rule. This is due to the facts that we cannot know at lex time a whether whole, positive number is an $\kw{Int}$ or $\kw{Nat}$, and that a negative $\kw{Int}$ literal can be written (and is lexed/parsed as) the unary negation of a $\kw{Nat}$.
+
+Note that in \rn{TE-NUM} the type is dependant exclusively on the presence of a decimal point. The $\mathsf{widest}$ function can allow a $\kw{Nat\ |\ Int}$ to 'become' a $\kw{Real}$.
+
+\rn{TE-VAR}, \rn{TE-NEGATE} and \rn{TE-OP} are all trivial with the above functions.
+
+\rn{TE-FIELD} requires use of the record table $\Delta$. A fuller definition is written in the operational semantics. It checks that we are attempting field access on a record, and that the type is inferred to be the field type.
+
+\rn{TE-LAMBDA} is the first rule we see extend the typing context $\Gamma$. We need to set the type of each parameter in the typing context for the expression, which should have the same return type of the lambda expression.
+
+\rn{TE-COND} uses the $\mathsf{widest}$ function to allow conditional expressions with differing number types on either side.
+
+\subsubsection{Statement typing}
+\begin{mathpar}
+  	\inferrule*[right=TS-DECL]
+  	{ \Gamma \vdash e : \tau}
+  	{ \Gamma \vdash_{\tau_r} \kw{Var}\ x:\tau = e \dashv \Gamma, x:\tau}
+  	\and
+  	\inferrule*[right=TS-READ]
+  	{ \text{Read input is of type }\tau}
+  	{ \Gamma \vdash_{\tau_r} \kw{Var}\ x : \tau= \kw{Read} \dashv \Gamma,x:\tau}
+  	\and
+  	\inferrule*[right=TS-ASSIGN]
+  	{ x:\tau \in \Gamma \\ \Gamma\vdash e:\tau }
+  	{ \Gamma\vdash_{\tau_r} x:=e \dashv\Gamma}
+  	\and
+  	\inferrule*[right=TS-WHILE]
+  	{ \Gamma \vdash e : \kw{Bool} \\ \Gamma \vdash_{\tau_r} b }
+  	{ \Gamma \vdash_{\tau_r} \kw{While}\ (e)\ b \dashv \Gamma }
+  		\and
+  	\inferrule*[right=TS-COND]
+  	{ \Gamma\vdash e: \kw{Bool} \\ \Gamma \vdash_{\tau_r} b_1 \\ \Gamma \vdash_{\tau_r} b_2}
+  	{ \Gamma\vdash_{\tau_r} \kw{If}\ (e)\ \kw{Then}\ b_1\ \kw{Else} \ b_2 \dashv \Gamma}
+  	\and
+  	\inferrule*[right=TS-RET]
+  	{\Gamma\vdash e : \tau_r}
+  	{\Gamma \vdash_{\tau_r}\kw{Ret}\ e\dashv\Gamma}
+  	\and
+  	\inferrule*[right=TS-PRINT]
+  	{\Gamma\vdash e:\tau }
+  	{\Gamma \vdash_{\tau_r}\kw{Print}\ e\dashv\Gamma}
+  	\and
+  	\inferrule*[right=TS-BLOCK]
+  	{ \Gamma_0 \vdash_{\tau_r} s_1 \dashv \Gamma_1 \\
+  		\Gamma_1 \vdash_{\tau_r} s_2 \dashv \Gamma_2 \\
+  		\cdots \\
+  		\Gamma_{n-1} \vdash_{\tau_r} s_n \dashv \Gamma_n }
+  	{ \Gamma_0 \vdash_{\tau_r} \{\, s_1; \ldots; s_n \,\} }
+\end{mathpar}
+
+Statements do not `have type', they are `well-typed'. Thus, their rules do not judge type, they `return' typing contexts to be used for the next statement.
+
+In these rules, we also pass around a return type $\tau_r$ meaning the return type of the block the statement is running in. If the block does not have a return type, as in \rn{TP-PROG} we say that the return type is $\bullet$, meaning that a type is \textit{not allowed} to return.
+
+In \rn{TS-DECL} and \rn{TS-READ} we extend $\Gamma$ to contain (`know') the type of a variable. We leave \rn{TS-READ} as an informal rule, as it can only be judged at input time.
+
+\rn{TS-ASSIGN} asks $\Gamma$ for the type of $x$. This is a parse error if not defined. Then we check that we are trying to assign a variable to an expression of the same type.
+
+\rn{TS-WHILE} and \rn{TS-COND} are trival.
+
+Note that in \rn{TS-PRINT}, while we can print any type, we must check that the expression $e$ is well-typed.
+
+\rn{TS-RET} is the only rule to use $\tau_r$. It's premise requires $e$ to be the correct type that is returns.
+
+\rn{TS-BLOCK} simply evaluates each statement in turn.
+
+\subsubsection{Program typing}
+\begin{mathpar}
+  	\inferrule*[right=TP-PROG]
+  	{ \Gamma_0 = \overline{f_j : (\tau_{j,1}, \ldots, \tau_{j,k_j}) \to \tau'_j} \\
+  	  \big(\, \Gamma_0,\ x_{j,1}:\tau_{j,1}, \ldots, x_{j,k_j}:\tau_{j,k_j} \vdash_{\tau'_j} b_j \,\big)_{j} \\
+  	  \Gamma_0 \vdash_{\bullet} \{\, s_1; \ldots; s_n \,\} }
+  	{ \vdash p\ \text{is well-typed} }
+\end{mathpar}
+
+The \rn{P-PROG} rule only needs judge if $p$ is well-typed, and does not currently have a $\Gamma$.
+
+The rules premises:
+\begin{enumerate}
+	\item establish a new typing context $\Gamma_0$, where each function $f_j$ has parameter types $(\tau_1,\ldots,\tau_k)$ and returns $\tau'$.
+	\item check that every function body is well-typed.
+	It says: for each of $j$ functions, start from $\Gamma_0$ and extend it with $f_j$'s parameters.
+	Under that context, check that the body $b_j$ returns $\tau'_j$
+	\item run the top level statements in $\Gamma_0$.
+\end{enumerate} 
+
+
+
+\subsection{Operational Semantics}
+% Key rules here; the remainder go in Appendix A. Example:
+
+\subsubsection{Notation}
+ We write:
+ \begin{itemize}
+ 	\item $\overline{x_n}$ to mean $x_1, \dots, x_n$, and $\overline{x : \tau}$ for
+ 	$x_1 : \tau_1, \ldots, x_n : \tau_n$. $\rho[\overline{x} \mapsto \overline{\ell}]$ abbreviates
+ 	$\rho[x_1 \mapsto \ell_1, \ldots, x_n \mapsto \ell_n]$, and $\overline{\ell} \notin \mathrm{dom}(\sigma)$
+ 	means the $\ell_i$ are distinct and none is in $\mathrm{dom}(\sigma)$.
+ 	\item a value $v\ ::=\ n\mid \kw{True} \mid \kw{False}\mid R(\overline{v_n})\mid \clo{\overline{x}}{b}{\rho}$. $b$ in closure is a block body.
+ 	\item an environment $\rho : \kw{Var} \to \kw{Loc}$ to mean a function that maps a variable name $\kw{Var}$ to a location $\kw{Loc}$.
+ 	\item that the store $\sigma : \kw{Loc} \to \kw{Value}$ maps a location $\kw{Loc}$ to a value $\kw{Value}$.
+ 	\item $f[a\mapsto b]$ to mean update $f$ so that it maps $a$ to $b$.
+ 	\item $\mathsf{dom}(\sigma)$ to mean the set of locations that $\sigma$ is defined on.
+	\item the outcome of a \textit{statement} $r\ ::=\ \mathsf{normal}\mid \mathsf{ret}\ v$, where $\mathsf{normal}$ is a statement that does not return nor throw an error, and $\mathsf{ret}\ v$ is a statement that returns a value $v$.
+	\item $\mathsf{\hat{\oplus}}$ to mean the result of a binary operation $\oplus$ on two values, $v_1, v_2$
+	\item $\Delta$ for the \textit{record table}, which maps each record name $R$ declared in the program to its fields, so $\Delta(R) = (f_1 : \tau_1, \ldots, f_n : \tau_n)$. $\Delta$ is built once by \rn{P-PROG} and never changes, so we leave it implicit in the judgements.
+ \end{itemize}
+\subsubsection{Semantic Judgements}
+We write four kinds of judgement:
+\begin{itemize}
+    \item Statements:
+
+          \begin{center}
+              $\config{s,\rho,\sigma}\eval\config{r,\rho',\sigma'}$
+          \end{center}
+
+          A statement $s$, in environment $\rho$ with store $\sigma$ evaluates to an outcome $r$, an updated environment $\rho'$ and store $\sigma'$.
+    \item Blocks:
+
+          \begin{center}
+              $\config{b,\rho,\sigma}\eval \config{r,\sigma'}$
+          \end{center}
+          
+          A block $b$, in environment $\rho$ and store $\sigma$ evaluates to an outcome $r$ and an updated store $\sigma'$.
+    \item Expressions:
+
+          \begin{center}
+              $\config{ e, \rho, \sigma }\eval\config{ v, \sigma' }$ 
+          \end{center}
+
+          An expression $e$ in environment $\rho$ and store $\sigma$ evaluates to a value and updated store $\sigma'$
+    \item Programs:
+          
+          \begin{center}
+              $\config{p}\eval\config{\sigma'} $ 
+          \end{center}
+
+          A program $p$ runs and ends with an updated store $\sigma'$
+\end{itemize}
+
+\subsubsection{Evaluation Semantics}
+\begin{mathpar}
+	\inferrule*[right=E-Num]
+	{ }
+	{\config{n,\rho,\sigma} \eval \config{n,\sigma}}
+	\\\\ \and
+	\inferrule*[right=E-True]
+	{ }
+	{\config{\kw{True},\rho,\sigma} \eval \config{\kw{True},\sigma}}
+	\and
+	\inferrule*[right=E-False]
+	{ }
+	{\config{\kw{False},\rho,\sigma} \eval \config{\kw{False},\sigma}}
+	\\\\ \and
+	\inferrule*[right=E-Var]
+	{ \rho(x)=\ell}
+	{\config{x,\rho,\sigma} \eval \config{\sigma(\ell),\sigma}}
+	\and
+	\inferrule*[right=E-Neg]
+	{\config{e, \rho, \sigma} \eval \config{v, \sigma'}}
+	{\config{-e, \rho, \sigma} \eval \config{\mathsf{\hat{-}}v, \sigma'}}
+	\and
+	\inferrule*[right=E-Op]
+	{\config{e_1, \rho, \sigma} \eval \config{v_1, \sigma_1} \\
+		\config{e_2, \rho, \sigma_1} \eval \config{v_2, \sigma_2}}
+	{\config{e_1 \oplus e_2, \rho, \sigma} \eval \config{v_1 \mathbin{\hat{\oplus}} v_2, \sigma_2}}
+	\\\\ \and
+	\inferrule*[right=E-Cond-T]
+	{\config{e,\rho, \sigma}\eval\config{\kw{True}, \sigma'} \\ \config{e_1, \rho, \sigma'}\eval\config{v_1, \sigma''}}
+	{\config{e\ ?\ e_1 : e_2, \rho, \sigma}
+		\eval
+		\config{v_1, \sigma''}}
+	\and
+	\inferrule*[right=E-Cond-F]
+	{\config{e,\rho, \sigma}\eval\config{\kw{False}, \sigma'} \\ \config{e_2, \rho, \sigma'}\eval\config{v_2, \sigma''}}
+	{\config{e\ ?\ e_1 : e_2, \rho, \sigma}
+		\eval
+		\config{v_2, \sigma''}}
+		\and
+		\inferrule*[right=E-Field]
+		{\config{e, \rho, \sigma} \eval \config{R(v_1, \ldots, v_n), \sigma'} \\
+			\Delta(R) = (f_1 : \tau_1, \ldots, f_n : \tau_n) \\
+			f = f_i}
+		{\config{e.f, \rho, \sigma} \eval \config{v_i, \sigma'}}
+		\and
+		\inferrule*[right=E-Record]
+		{\config{e_i, \rho, \sigma_{i-1}} \eval \config{v_i, \sigma_i} \quad (1 \le i \le n)}
+		{\config{\kw{New}\ R(\overline{e}), \rho, \sigma_0} \eval \config{R(\overline{v}), \sigma_n}}
+		\and
+		\inferrule*[right=E-Lambda]
+		{ }
+		{\config{\kw{Lambda}\ (\overline{x : \tau}) : \tau' \Rightarrow e, \rho, \sigma}
+			\eval
+			\config{\clo{\overline{x}}{\{\kw{Ret}\ e;\}}{\rho}, \sigma}}
+		\and
+		\inferrule*[right=E-App]
+		{\config{e, \rho, \sigma} \eval \config{\clo{\overline{x}}{b}{\rho_\theta}, \sigma_0} \\
+			\config{e_i, \rho, \sigma_{i-1}} \eval \config{v_i, \sigma_i} \quad (1 \le i \le n) \\\\
+			\overline{\ell} \notin \mathrm{dom}(\sigma_n) \\
+			\config{b, \rho_\theta[\overline{x} \mapsto \overline{\ell}], \sigma_n[\overline{\ell} \mapsto \overline{v}]} \eval \config{\mathsf{ret}\ v, \sigma'}}
+		{\config{e(\overline{e}), \rho, \sigma}
+			\eval
+			\config{v, \sigma'}}
+\end{mathpar}
+
+\rn{E-NUM}, \rn{E-TRUE}, \rn{E-FALSE} are trivial.
+
+In \rn{E-VAR} we see the first example using $\rho$ and $\sigma$. In this rule we retrieve a memory location $\ell$ from $\rho$ and then see that the return $\kw{Value}$ is the value at $\sigma(\ell)$. 
+
+In \rn{E-NEG} and \rn{E-OP} we see an example of $\mathsf{\hat{\oplus}}$, where after evaluating the expressions on either side, we return the value of the operation applied between the two. Rules for each operation are defined in the appendix (TODO).
+
+The \rn{E-COND} rules are trivial.
+
+In \rn{E-FIELD} we require that $e$ evaluates to a record with values $\overline{v}$. This can be achieved with \rn{E-VAR}. We then require that the given record $R$ has fields $f_1,\ldots,f_n$ and that $f$ is one of those named fields $f_i$, and return the value of that field $v_i$.
+
+In \rn{E-RECORD} we see that, for a record construction $R(\overline{e})=R(e_1,\ldots,e_n)$, we must evaluate each $e_i$ to a value $v_i$ (mutating and passing a state along the way) and return a new record $R(\overline{v})=R(v_1,\ldots,v_n)$ with the last state after each expression has been evaluated $\sigma_n$.
+
+In \rn{E-LAMBDA} we must return a closure. The closure $\clo{\overline{x}}{\{\kw{Ret}\ e;\}}{\rho}$ represents everything a function needs to run: the parameters $\overline{x}$, the return statement (a lambda is a function that must immediately return an expression on those parameters with its own arguments), and the environment $\rho$ in which it is created (it can see variables defined before it is created).
+
+In \rn{E-APP} we first evaluate $e$, which must give a closure $\clo{\overline{x}}{b}{\rho_\theta}$ (made by \rn{E-LAMBDA}, or by \rn{P-PROG} for a $\kw{Func}$). We then evaluate each argument $e_i$ to a value $v_i$ from left to right, passing the store along as in \rn{E-RECORD}, ending with $\sigma_n$. Each parameter needs somewhere to live, so we pick fresh locations $\overline{\ell}$ that are not already in $\sigma_n$; because every call gets new locations, a recursive call cannot overwrite its caller's parameters. Finally we run the body $b$ in the closure's environment $\rho_\theta$ extended with $\overline{x} \mapsto \overline{\ell}$, and in the store $\sigma_n$ extended with $\overline{\ell} \mapsto \overline{v}$. The body runs in $\rho_\theta$, not the caller's $\rho$, so it sees the variables from where the function was written rather than where it is called (static scoping). The body must finish with $\mathsf{ret}\ v$: this is the one place an outcome is turned back into a value, and $v$ with the final store $\sigma'$ is the result of the call.
+
+\subsubsection{Statement Semantics}
+\begin{mathpar}
+    \inferrule*[right=S-Var]
+    {\config{e, \rho, \sigma} \eval \config{v, \sigma'} \\
+    	\ell \notin \mathrm{dom}(\sigma')}
+    {\config{\kw{Var}\ x : \tau = e, \rho, \sigma}
+    	\eval \config{\mathsf{normal}, \rho[x \mapsto \ell], \sigma'[\ell \mapsto v]}}
+   	\and
+	\inferrule*[right=S-Read]
+{v \text{ of type } \tau \text{ is read from input} \\ \ell \notin \mathrm{dom}(\sigma)}
+{\config{\kw{Var}\ x : \tau = \kw{Read}, \rho, \sigma}
+    \eval \config{\mathsf{normal}, \rho[x \mapsto \ell], \sigma[\ell \mapsto v]}}
+   	\\\\ \and
+   	\inferrule*[right=S-Assign]
+   	{\config{e, \rho, \sigma} \eval \config{v, \sigma'} \\
+   		\rho(x) = \ell}
+   	{\config{x := e, \rho, \sigma}
+   		\eval \config{\mathsf{normal}, \rho, \sigma'[\ell \mapsto v]}}
+    \\\\ \and
+	\inferrule*[right=S-While-F]
+	{\config{e, \rho, \sigma} \eval \config{\kw{False}, \sigma'}}
+	{\config{\kw{While}\ (e)\ b, \rho, \sigma} \eval \config{\mathsf{normal}, \rho, \sigma'}}
+	\and
+	\inferrule*[right=S-While-T]
+	{\config{e, \rho, \sigma} \eval \config{\kw{True}, \sigma'} \\
+		\config{b, \rho, \sigma'} \eval \config{\mathsf{normal}, \sigma''} \\
+		\config{\kw{While}\ (e)\ b, \rho, \sigma''} \eval \config{r, \rho, \sigma'''}}
+	{\config{\kw{While}\ (e)\ b, \rho, \sigma} \eval \config{r, \rho, \sigma'''}}
+	\and
+	\inferrule*[right=S-While-Ret]
+	{\config{e, \rho, \sigma} \eval \config{\kw{True}, \sigma'} \\
+		\config{b, \rho, \sigma'} \eval \config{\mathsf{ret}\ v, \sigma''}}
+	{\config{\kw{While}\ (e)\ b, \rho, \sigma} \eval \config{\mathsf{ret}\ v, \rho, \sigma''}}
+	\\\\ \and
+	\inferrule*[right=S-If-T]
+	{\config{e,\rho,\sigma}\eval\config{\kw{True}, \sigma'} \\ \config{b_1, \rho,\sigma'}\eval\config{r_1,\sigma''}}
+	{\config{\kw{If}\ (e)\ b_1\ \kw{Else}\ b_2, \rho, \sigma} \eval \config{r_1,\rho,\sigma''}}
+	\and
+	\inferrule*[right=S-If-F]
+	{\config{e,\rho,\sigma}\eval\config{\kw{False}, \sigma'} \\ \config{b_2, \rho,\sigma'}\eval\config{r_2,\sigma''}}
+	{\config{\kw{If}\ (e)\ b_1\ \kw{Else}\ b_2, \rho, \sigma} \eval \config{r_2,\rho,\sigma''}}
+	\\\\ \and
+	\inferrule*[right=S-Ret]
+	{\config{e,\rho,\sigma}\eval\config{v,\sigma'}}
+	{\config{\kw{Ret}\ e, \rho, \sigma}\eval \config{\mathsf{ret}\ v, \rho,\sigma'}}
+	\\\\ \and
+	\inferrule*[right=S-Print]
+	{\config{e,\rho,\sigma}\eval\config{v,\sigma'}}
+	{\config{\kw{Print}\ e, \rho, \sigma}\eval\config{\mathsf{normal}, \rho, \sigma'}}
+\end{mathpar}
+
+A reminder that a statement can finish normally with $\mathsf{normal}$ or return a value with $\mathsf{ret}\ v$. 
+
+In \rn{S-VAR} we evaluate an expression $e$ to a value $v$, define a fresh location $\ell \notin \mathsf{dom}(\sigma')$ and store the value there. This is notable as the only statement (or rule) that mutates the environment $\rho$. 
+
+We leave \rn{S-Print} as an informal rule. we read $v$, ensure it is of the correct type $\tau$ and store it.  
+
+In \rn{S-ASSIGN} we see a similar structure, only with a mutated store, getting the location to store at through $\rho$. $\rho$ is unchanged in this rule: the variable must already be declared.
+
+There are three cases for while loops: where the condition is false, or true, or the loop returns early with a $\mathsf{ret}\ v$ statement. \rn{S-WHILE-T} is recursive, after running the body once, it evaluates to the same statement with a mutated state. \rn{S-WHILE-RET} returns from the loop early, and passes that value down. Note that the body is a block, its inner environment is thrown away, so that any variable declared in the block is discarded after running.
+
+In the \rn{S-IF} statements, the condition is evaluated first, then the correct block is selected to be evaluated. The outcome of the block is passed on, so that a $\kw{Ret}$ escapes the $\kw{If}$.
+
+When a statement returns, we evaluate the expression to a value $v$ and end with a result $\mathsf{ret}\ v$.
+
+We leave \rn{S-Print} as an informal rule. We do need to evaluate $e\to v$ to print it, but the actual printing to console is an external side effect that I do not deem necessary to model. 
+
+
+\subsubsection{Block Semantics}
+
+\begin{mathpar}
+	\inferrule*[right=B-Empty]
+	{ }
+	{\config{\{ \ \}, \rho, \sigma} \eval \config{\mathsf{normal}, \sigma}}
+	\\\\ \and
+	\inferrule*[right=B-Seq]
+	{\config{s_1, \rho, \sigma}\eval\config{\mathsf{normal}, \rho', \sigma'} \\ \config{\{\ \overline{s}\ \}, \rho', \sigma'} \eval \config{r, \sigma''}}
+	{\config{\{ s_1; \overline{s}; \}, \rho, \sigma} \eval \config{r, \sigma''}}
+	\\\\ \and
+	\inferrule*[right=B-Ret]
+	{\config{s_1, \rho, \sigma}\eval\config{\mathsf{ret}\ v, \rho', \sigma'}}
+	{\config{\{ s_1; \overline{s}; \}, \rho, \sigma} \eval \config{\mathsf{ret}\ v, \sigma'}}
+\end{mathpar}
+
+Clearly an empty block simply returns a $\mathsf{normal}$ outcome.
+
+\rn{B-SEQ} takes a list of statements $\overline{s}$ and extracts the first, $s_1$. If $s_1$ returns a $\mathsf{normal}$ outcome, we take the rest of the block (this can be the empty block), and evaluate that.
+
+\rn{B-RET} is how a block returns early, we see that the remaining statements $\overline{s}$ are discarded and not run, returning just $\mathsf{ret}\ v$.
+\subsubsection{Program Semantics}
+\begin{mathpar}
+	\inferrule*[right=P-Prog]
+	{\mathrm{funcs}(p) = \kw{Func}\ F_j (\overline{x_j : \tau_j}) : \tau'_j = b_j \quad (1 \le j \le k) \\
+		\mathrm{stmts}(p) = \overline{s} \\\\
+		\Delta = \{ R \mapsto (\overline{f : \tau}) \mid \kw{Record}\ R\ (\overline{f : \tau}) \in p \} \\\\
+		\ell_1, \ldots, \ell_k \text{ distinct} \\
+		\rho_g = [F_1 \mapsto \ell_1, \ldots, F_k \mapsto \ell_k] \\\\
+		\sigma_0 = [\ell_1 \mapsto \clo{\overline{x_1}}{b_1}{\rho_g}, \ldots, \ell_k \mapsto \clo{\overline{x_k}}{b_k}{\rho_g}] \\\\
+		\config{\{ \overline{s} \}, \rho_g, \sigma_0} \eval \config{\mathsf{normal}, \sigma'}}
+	{\config{p} \eval \config{\sigma'}}
+\end{mathpar}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+The master program rule. Going through all the premises:
+\begin{enumerate}
+	\item $\mathrm{funcs}(p) = \kw{Func}\ F_j (\overline{x_j : \tau_j}) : \tau'_j = b_j \quad (1 \le j \le k)$
+	
+	We take all the $k$ functions of the program $p$ and index them. We call the name of the function $F_j$.
+	
+	\item $\mathrm{stmts}(p) = \overline{s}$
+	
+	We take all the $n$ statements of the program $p$, in order, as a list $\overline{s}=s_1,\ldots,s_n$.
+	
+	\item $\Delta = \{ R \mapsto (\overline{f : \tau}) \mid \kw{Record}\ R\ (\overline{f : \tau}) \in p \}$
+	
+	We build the record table from the record declarations. Records have no run-time behaviour (they create no locations and no values), so this is the only place they appear. Record values store their fields by position only, so \rn{E-FIELD} uses $\Delta$ to find the position of a field from its name.
+	
+	\item $\ell_1, \ldots, \ell_k$ distinct
+	
+	We choose one new location for each function. The store is empty at this point, so they only need to differ from each other.
+	
+	\item $\rho_g = [F_1 \mapsto \ell_1, \ldots, F_k \mapsto \ell_k]$
+	
+	The global environment $\rho_g$ binds each function name to its location. Functions are values, so a function name is looked up like any other variable with \rn{E-VAR}.
+	
+	\item $\sigma_0 = [\ell_1 \mapsto \clo{\overline{x_1}}{b_1}{\rho_g}, \ldots, \ell_k \mapsto \clo{\overline{x_k}}{b_k}{\rho_g}]$
+	
+	The initial store holds a closure for each function. Every closure captures $\rho_g$ itself, so every function can see every other function, including itself. This gives recursion, mutual recursion and calls to functions declared later in the program (\textit{hoisting}). Since $\rho_g$ contains only functions, a function cannot see top-level variables.
+	
+	\item $\config{\{ \overline{s} \}, \rho_g, \sigma_0} \eval \config{\mathsf{normal}, \sigma'}$
+	
+	Finally, the top-level statements are run as a single block in $\rho_g$ and $\sigma_0$. The block must finish with $\mathsf{normal}$, so a top-level $\kw{Ret}$ has no rule and the program gets stuck. The result of the program is the final store $\sigma'$.
+\end{enumerate}
+
+% ==========================================================================
+\section{Implementation}
+% Technical details, and how each part corresponds to the formal semantics.
+
+The implementation is written in \csharp.
+
+It has four parts that act in a chain: $\textsc{Lexer} \to \textsc{Parser} \to \textsc{Type Checker} \to \textsc{AST Interpreter}$ that implement the chain of data $\textsc{Text} \to \textsc{Tokens} \to \textsc{AST Nodes} \to \textsc{Type Checked AST Nodes}$.
+
+The program can then be ran through the interpreter that is the $\texttt{P\_Prog.Execute()}$ method.
+
+\subsection{Architecture}
+\subsubsection{AST Nodes}
+The implementation of the AST nodes is easy once we have defined grammar and operational semantic rules. 
+
+Each grammar rule from the syntax can map exactly to a \csharp record and its own AST node with its operational semantics.
+
+All structural elements of the language can be found in \texttt{MiniProject.Language/Structure}.
+
+We begin by defining the base abstract records representing the 8 terminals in our language syntax. 
+
+The choice of records over classes is a considered one. In \csharp, records are immutable, that is, once defined it's member variables may not be changed. This allows us to be sure throughout the implementation that external operations cannot change node state or semantics.
+
+A language structure element will has mutability precisely where it is needed.
+
+The abstracts are as follows:
+
+\begin{center}
+\begin{tabular}{rll}
+	$\oplus$ & \lstinline|abstract record Operation;| &  \texttt{Operators.cs}\\
+	$\tau$   & \lstinline|abstract record Type;| & \texttt{Types.cs} \\
+	$e$      & \lstinline|abstract record Expr;| & \texttt{Expressions.cs} \\
+	$b$      & \lstinline|abstract record Block;| & \texttt{Block.cs} \\
+	$s$      & \lstinline|abstract record Stmt;| & \texttt{Statements.cs} \\
+	$d$      & \lstinline|abstract record Decl;| & \texttt{Declarations.cs} \\
+	$c$      & \lstinline|abstract record Com;| & \texttt{Commands.cs} \\
+	$p$      & \lstinline|abstract record Prog;| & \texttt{Program.cs} \\
+\end{tabular}
+\end{center}
+
+For each \lstinline|abstract| record, we define \lstinline|sealed| record for each form the terminal can take that stores the data needed to evaluate it.
+
+For example:
+\begin{center}
+\begin{tabular}{l}
+	\lstinline|sealed record OP_Plus : Operation|\\
+	\lstinline|sealed record T_Record(string Name) : Type|\\
+	\lstinline|sealed record E_Op(Expr E1, Operation Op, Expr E2) : Expr| \\
+	\lstinline|sealed record B_Block(IReadOnlyList<Stmt> Statements) : Block| \\
+	\lstinline|sealed record S_Assign(string Variable, Expr Expr) : Stmt| \\
+	\lstinline|sealed record D_Record(string Name, IReadOnlyList<Param> Params) : Decl| \\
+	\lstinline|sealed record C_Stmt(Stmt Stmt) : Com;|\\
+	\lstinline|sealed record P_Prog(IReadOnlyList<Com> Commands) : Prog|
+\end{tabular}
+\end{center}
+
+Then, when moving to semantics, we must define a model for environment $\rho$ and state (store) $\sigma$.
+
+We do this with the following objects:
+\begin{lstlisting}[language=CSharp, tabsize=4]
+	sealed class Ref(Value value) {
+		public Value Value { get; set; } = value;
+	}
+	
+	sealed record Env(ImmutableDictionary<string, Ref> Vars, 
+		ImmutableDictionary<string, IReadOnlyList<Param>> Records)
+	{
+		public Ref GetRef(string name) {
+			return Vars.TryGetValue(name, out Ref? r) 
+				? r 
+				: throw new Exception("Undefined variable access.");
+		}
+		
+		public IReadOnlyList<Param> GetRecord(string name) {
+			return Records.TryGetValue(name, out IReadOnlyList<Param>? r) 
+				? r 
+				: throw new Exception("Undefined record access.");
+		}
+		
+		public Env Bind(string name, Value val)
+			=> this with { Vars = Vars.SetItem(name, new Ref(val)) };
+	}
+\end{lstlisting}
+
+Here, \lstinline|Ref| acts as our  $\sigma : \kw{Loc} \to \kw{Value}$, and \lstinline|Env| acts as our $\rho : \kw{Var} \to \kw{Loc}$. We carry $\sigma$ in $\rho$ for convenience. 
+
+Note the difference in mutability here. \lstinline|Ref| contain a value that can be changed, thus must be implemented as a mutable class. \lstinline|Env| is strictly immutable, with each binding returning a new \lstinline|Env|. This is so we can separate environments in our rules.
+
+We then map each of the semantic judgements to a function implemented on every terminal. For this language that is $e,\ s,\ b,\ p$.
+ 
+We extend each record:
+
+\begin{lstlisting}[language=CSharp, tabsize=4]
+	abstract record Expr {
+		public abstract Value Evaluate(Env Env);
+	}
+	
+	abstract record Stmt {
+		public abstract (Outcome, Env) Execute(Env Env);
+	}
+	
+	abstract record Block {
+		public abstract Outcome Execute(Env Env);
+	}
+	
+	abstract record Prog {
+		public abstract void Execute();
+	}
+\end{lstlisting}
+
+These abstract functions are where our terms will implement their own semantic judgements.
+
+Statements are the only things that can mutate state, so need to return a new environment along with their outcome.
+
+Each inheritor now must have these rules defined on them. Incidently, it makes it easy to extend the language: one can add a new term, rule, and sealed record implementing the rule.
+\subsection{Correspondence with the Formal Semantics}
+
+Now that the abstracts have defined rules on them, we can inspect the terms, for example:
+
+\begin{lstlisting}[language=CSharp, tabsize=4]
+sealed record E_Var(string Name) : Expr {
+	public override Value Evaluate(Env Env) {
+		return Env.GetRef(Name).Value;
+	}
+}
+\end{lstlisting}
+
+We see that this closely follows the \rn{E-VAR} rule: An $e := x$ term takes the variable name, retrieves its location from the environment, and returns the value in the store. 
+
+Another example:
+\begin{lstlisting}[language=CSharp, tabsize=4]
+sealed record S_Cond(Expr Cond, B_Block OnTrue, B_Block OnFalse) : Stmt {
+	public override (Outcome, Env) Execute(Env Env) {
+		Value cond = Cond.Evaluate(Env);
+		if (cond is not V_Bool cond_result) 
+			throw new Exception("Attempted condition on non bool.");
+		if(cond_result.Value) {
+			return (OnTrue.Execute(Env), Env);
+		}
+		else {
+			return (OnFalse.Execute(Env), Env);
+		}
+	}
+}
+\end{lstlisting}
+
+Here we see an example of a term implementing 2 rules at once. We require that each term implements every judgement on which it is found.
+
+Note that we could have defined a method per semantic rule, but that not only almost doubles the code we need to write, but also adds extra logic for where a term does not actually know which rule it is currently taking the form of (as in the \rn{S-WHILE} rules).
+
+With all terms, forms, rules, and judgements implemented, we now have a working AST Interpreter: One can define an program using these structural elements and execute it with $\rn{P-PROG}$ (\texttt{P\_PROG.Execute()}).
+
+\subsection{Type Checker}
+
+\subsubsection{Sub-Typing}
+
+On reaching the type-checker, we reach a fundamental design decision: Sub-typing.
+
+We have seen that we don't have a way to differentiate between $\kw{Nat}$ and $\kw{Int}$ literals. We could have asked the user to write $\kw{32n}$ or $\kw(32i)$, but frankly the payout isn't worth it at this stage.
+
+Instead, we say that $\kw{Num}$ types can \textit{widen} with $\kw{Nat}\sqsubseteq\kw{Int}\sqsubseteq\kw{Real}$. Essentially, any type can be assigned to a type on the right of it.
+
+This requires the notion of type \textit{Coercion} and \textit{Promotion} (applying only to $\kw{Num}$ types).
+
+Coercion takes two optionally distinct value types $v1,v2$ and returns two values of the same type (the widest possible).
+
+Promotion takes a value and returns that numerical value in any wider type.
+
+This is required for the implementation of operations. When an operation receives two values, it first coerces the two operands to the same type, and returns the evaluated value in that type. This means that we can implement $\kw{Nat}+\kw{Real}$, but we require that the return type is $\kw{Real}$ .
+
+\subsubsection{Implementation}
+We first define the type context $\Gamma$ in code:
+\begin{lstlisting}[language=CSharp, tabsize=4]
+	public sealed record Context(ImmutableDictionary<string, Type> Vars) {
+		public Type Lookup(string name)
+			=> Vars.TryGetValue(name, out Type? t) 
+				? t 
+				: throw new UnBoundVarException(name);
+		
+		public Context Bind(string name, Type type)
+			=> this with { Vars = Vars.SetItem(name, type) };
+	}
+\end{lstlisting}
+
+This closely follows \texttt{Env}.
+
+We can lookup a variable's type, and bind a variable to a type. Again, binding a variable's type returns a new $\Gamma$ so that individual rules can handle state.
+
+With this we construct a type-checker that implements our type system.
+
+The type-checker has a main \texttt{TypeChecker.Check(P\_Prog)} that builds the global context and recurses down the program, type-checking every statement, expression, and block in turn:
+\begin{lstlisting}[language=csharp, tabsize=4]
+public void Check(P_Prog p) {
+	foreach(D_Record r in p.Records) {
+		delta.Add(r.Name, r.Params);
+	}
+	
+	Dictionary<string, Type> vars = [];
+	foreach (D_Func f in p.Funcs) {
+		vars.Add(f.Name, new T_Func(f.Params.Select(x => x.Type).ToList(), f.ReturnType));
+	}
+	
+	CheckProgram(p, new Context(vars.ToImmutableDictionary()));
+} 
+\end{lstlisting}
+
+
+
+
+
+% ==========================================================================
+\section{Distinctive-Feature Example Program}
+% 1--2 paragraphs describing an example program that shows off the language.
+
+% ==========================================================================
+\section{Reflection on AI and Collaboration}
+% 1 paragraph.
+
+% ==========================================================================
+\printbibliography
+
+\appendix
+\section{Remaining Operational Semantics Rules}
+
+\end{document}
