@@ -1,6 +1,7 @@
-# MiniProject
+# numa
 
-PLPDI mini-project.
+A small, statically typed imperative language with first-class functions and
+numeric subtyping (`Nat <: Int <: Real`), implemented in C#. Personal project.
 
 - `MiniProject.Language` — class library: the language implementation
 - `MiniProject.Language.Cli` — console front end

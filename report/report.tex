@@ -24,10 +24,8 @@
 }
 
 % --- Front matter details -------------------------------------------------
-\newcommand{\langname}{LanguageName}            % TODO: name of the language
-\newcommand{\studentid}{2763839}                % TODO: student ID
-\newcommand{\giturl}{https://github.com/DavidTilman/plpdi-mini-project}
-\newcommand{\githash}{TODO}                     % TODO: commit hash of submitted code
+\newcommand{\langname}{numa}
+\newcommand{\giturl}{https://github.com/DavidTilman/numa}
 
 % --- Semantics notation ---------------------------------------------------
 \newcommand{\kw}[1]{\mathtt{#1}}                     % keyword / concrete syntax
@@ -38,18 +36,15 @@
 \newcommand {\csharp}{\texttt{C\#\ }}
 \newcommand{\clo}[3]{\mathsf{clo}(#1,\, #2,\, #3)}
 \newcommand{\rn}[1]{\TirNameStyle{#1}}
-\title{\langname: PLPDI Mini-Project}
-\author{David Tilman \\ Student ID: \studentid}
+\title{\langname: a small typed imperative language}
+\author{David Tilman}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{center}
-  \begin{tabular}{rl}
-    Repository: & \url{\giturl} \\
-    Commit:     & \texttt{\githash}
-  \end{tabular}
+  \url{\giturl}
 \end{center}
 
 % ==========================================================================
@@ -784,12 +779,6 @@ With all terms, forms, rules, and judgements implemented, we now have a working 
 % 1--2 paragraphs describing an example program that shows off the language.
 
 % ==========================================================================
-\section{Reflection on AI and Collaboration}
-% 1 paragraph.
-
-% ==========================================================================
-\printbibliography
-
 \appendix
 \section{Remaining Operational Semantics Rules}
 
