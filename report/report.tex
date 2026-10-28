@@ -3,15 +3,13 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\usepackage[margin=2.5cm]{geometry}
+\usepackage[margin=1cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{mathpartir}
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage[backend=biber,style=numeric]{biblatex}
 \usepackage[hidelinks]{hyperref}
-
-\addbibresource{references.bib}
 
 \lstset{
   basicstyle=\ttfamily\small,
@@ -60,11 +58,6 @@
 
 
 % ==========================================================================
-\section{Literature Review}
-% [Extended] 2--3 paragraphs situating the language among existing work.
-% Cite with \cite{key}; entries live in references.bib, e.g. \cite{pierce2002types}.
-
-% ==========================================================================
 \section{Formal Syntax and Semantics}
 
 \subsection{Syntax}
@@ -80,6 +73,7 @@
          & \mid & (\tau_1, \dots, \tau_n) \to \tau        & \text{function type} \\
          & \mid & R                                       & \text{record type} \\[4pt]
          & \mid & [\tau]                                  & \text{list} \\[4pt]
+         & \mid & \kw{EmptyList}                                  & \text{empty list} \\[4pt]
   e      & ::=  & n                                       & \text{literal} \\
          & \mid & \kw{True} \mid \kw{False}               & \text{bool literal} \\
          & \mid & x                                       & \text{variable} \\
@@ -91,6 +85,8 @@
          & \mid & \kw{Lambda}\ (x_1 : \tau_1, \dots, x_n : \tau_n) : \tau \Rightarrow e
                                                           & \text{lambda} \\
          & \mid & e\ ?\ e_1 : e_2                         & \text{if expression} \\[4pt]
+		 & \mid & [e_1, \ldots, e_n]                      & \text{list construction} \\
+		 & \mid & e_1\kw{\$}e_2                                    & \text{list indexing} \\
   b      & ::=  & \{\, s_1;\ \dots;\ s_n; \,\}            & \text{block } (n \ge 0) \\[4pt]
   s      & ::=  & \kw{Var}\ x : \tau = e                  & \text{declaration} \\
  		 & \mid & \kw{Var}\ x : \tau = \kw{Read} & \text{declaration from input} \\
@@ -109,12 +105,35 @@
 \end{array}
 \]
 
-$\kw{If}\ (e)\ b$ abbreviates $\kw{If}\ (e)\ b\ \kw{Else}\ \{\,\}$.
-Binary operations $\kw{\&\&}$, $\kw{||}$, are strict. They always evaluate both expressions.
 
 \subsection{Type System}
+\subsubsection{Sub-Typing}
+
+We have seen that we have 3 numeric types $\kw{Nat},\kw{Int},\kw{Real}$.
+
+However, we see that $3$ can be all three at once, $-3$ can be an $\kw{Int}$ or a $\kw{Real}$, and $3.5$ can only be a $\kw{Real}$.
+
+This is a problem when we want to make a valid statement such as \lstinline|Var x : Real = 3;|.
+
+To tackle this we define the notion of sub-typing:
+$$
+\kw{Nat}\sqsubseteq\kw{Int}\sqsubset\kw{Real}
+$$
+
+This has knock on effects for both the typing rules and implementation of it.
+
+We first define rules so that derivations can determine assign-ability of types:
+\begin{mathpar}
+	\inferrule*[right=S-REF]{ }{t \sqsubseteq t} \qquad
+	\inferrule*[right=S-TRANS]{t \sqsubseteq t' \\ t' \sqsubseteq t''}{t \sqsubseteq t''} \qquad
+	\inferrule*[right=S-NatInt]{ }{\kw{Nat} \sqsubseteq \kw{Int}} \qquad
+	\inferrule*[right=S-IntReal]{ }{\kw{Int} \sqsubseteq \kw{Real}}
+\end{mathpar}
+
+We then define $\mathsf{widest}(\tau_1, \tau_2)\triangleq \text{the type with the larger domain}$: $\kw{Nat}\leq\kw{Int}\leq\kw{Real}$. Widest is only defined for the three number types.
+
 \subsubsection{Notation}
-We define 3 functions:
+We define 4 functions:
 \begin{itemize}
 	\item $\mathsf{neg}(\tau)\triangleq \text{the resulting type when $\tau$ is negated}$:
 	
@@ -129,7 +148,32 @@ We define 3 functions:
 	
 	It is a partial function: $\mathsf{sig}(==, \kw{true}, \kw{3})$ is undefined. Where it is, the operation is not well-formed.
 	
-	\item $\mathsf{widest}(\tau_1, \tau_2)\triangleq \text{the type with the larger domain}$: $\kw{Nat}\leq\kw{Int}\leq\kw{Real}$. Widest is only defined for the three number types.
+	\item $\mathsf{join}(\tau_1, \tau_2)\triangleq$ the least type that both $\tau_1$ and $\tau_2$ are assignable to. It collapses the element types of a list literal into a single type (\rn{TE-LIST}) and types the concatenation of two lists. Like $\mathsf{sig}$ it is partial; where it is undefined the list is not well-typed. Taking the first applicable case:
+
+	$$
+	\mathsf{join}(\tau_1, \tau_2) =
+	\begin{cases}
+		\kw{EmptyList} & \tau_1 = \tau_2 = \kw{EmptyList} \\
+		[\tau] & \{\tau_1, \tau_2\} = \{\kw{EmptyList},\ [\tau]\} \\
+		[\,\mathsf{join}(\tau, \tau')\,] & \tau_1 = [\tau],\ \tau_2 = [\tau'] \\
+		\tau_1 & \tau_1 = \tau_2 \\
+		\mathsf{widest}(\tau_1, \tau_2) & \mathsf{widest}(\tau_1, \tau_2)\ \text{defined} \\
+		\text{undefined} & \text{otherwise}
+	\end{cases}
+	$$
+	
+	\item $\mathsf{fld}\triangleq\text{the type of a term's field}$
+	\[
+	\mathsf{fld}(\tau, f) =
+	\begin{cases}
+		\tau_i           & \tau = R,\ \Delta(R) = (\overline{f{:}\tau}),\ f = f_i \\
+		\kw{Nat}         & \tau = [\tau'],\ f = \kw{length} \\
+		\tau'            & \tau = [\tau'],\ f = \kw{head} \\
+		{[\tau']}        & \tau = [\tau'],\ f = \kw{tail} \\
+		\text{undefined} & \text{otherwise}
+	\end{cases}
+	\]
+	
 \end{itemize}
 
 \subsubsection{Expression typing}
@@ -159,24 +203,36 @@ We define 3 functions:
   	{\Gamma\vdash e_1 \oplus e_2 : \tau}
   	\and
   	\inferrule*[right=TE-FIELD]
-  	{\Gamma\vdash e : R \\ \Delta(R)=(f_1:\tau_1, \ldots, f_n:\tau_n) \\ f=f_i}
-  	{\Gamma \vdash e.f : \tau_i} 
+  	{\Gamma\vdash e : \tau \\ \mathsf{fld}(\tau, f) = \tau'}
+  	{\Gamma \vdash e.f : \tau'}
   	\and
   	\inferrule*[right=TE-APP]
-  	{ \Gamma \vdash e : (\tau_1, \ldots, \tau_n) \to \tau \\ \Gamma \vdash e_i : \tau_i \quad (1 \le i \le n) }
+  	{ \Gamma \vdash e : (\tau_1, \ldots, \tau_n) \to \tau \\ \Gamma \vdash e_i : \tau'_i \\ \tau'_i \sqsubseteq \tau_i \quad (1 \le i \le n) }
   	{ \Gamma \vdash e(e_1, \ldots, e_n) : \tau }
   	\and
   	\inferrule*[right=TE-RECORD]
-  	{ \Delta(R)=(f_1:\tau_1, \ldots, f_n:\tau_n) \\ \Gamma\vdash e_i:\tau_i}
+  	{ \Delta(R)=(f_1:\tau_1, \ldots, f_n:\tau_n) \\ \Gamma\vdash e_i:\tau'_i \\ \tau'_i \sqsubseteq \tau_i}
   	{ \Gamma\vdash \kw{New}\ R(e_1,\ldots,e_n):R}
   	\and
   	\inferrule*[right=TE-LAMBDA]
-  	{\Gamma, x_1:\tau_1, \ldots, x_n:\tau_n \vdash e : \tau}
+  	{\Gamma, x_1:\tau_1, \ldots, x_n:\tau_n \vdash e : \tau' \\ \tau' \sqsubseteq \tau}
   	{\Gamma \vdash \kw{Lambda}\,(x_1:\tau_1, \ldots, x_n:\tau_n):\tau \Rightarrow e : (\tau_1, \ldots, \tau_n) \to \tau}
   	\and
   	\inferrule*[right=TE-COND]
-  	{ \Gamma \vdash e : \kw{Bool} \\ \Gamma \vdash e_1: \tau_1 \\ \Gamma \vdash e_2: \tau_2 \\ \tau = \mathsf{widest}(\tau_1, \tau_2)}
+  	{ \Gamma \vdash e : \kw{Bool} \\ \Gamma \vdash e_1: \tau_1 \\ \Gamma \vdash e_2: \tau_2 \\ \tau = \mathsf{join}(\tau_1, \tau_2)}
   	{\Gamma\vdash (e\ ?\ e_1\ :\ e_2) : \tau}
+  	\and
+  	\inferrule*[right=TE-LIST]
+  	{ \Gamma\vdash e_i:\tau_i\ (1\leq i \leq n)}
+  	{ \Gamma\vdash [e_1,\ldots,e_n]:[\mathsf{join}(\tau_1,\ldots,\tau_n)]}
+  	\and
+  	\inferrule*[right=TE-EMPTY-LIST]
+  	{ }
+  	{ \Gamma\vdash [\ ]:\kw{EmptyList}}
+  	\and
+  	\inferrule*[right=TE-LIST-INDEX]
+  	{ \Gamma\vdash e_1 : [\tau] \\ \Gamma\vdash e_2 : \kw{Nat}}
+  	{ \Gamma\vdash e_1\$e_2 :\tau}
 \end{mathpar}
 
 % Expression typing explainer here.
@@ -186,16 +242,22 @@ Note that in \rn{TE-NUM} the type is dependant exclusively on the presence of a 
 
 \rn{TE-VAR}, \rn{TE-NEGATE} and \rn{TE-OP} are all trivial with the above functions.
 
-\rn{TE-FIELD} requires use of the record table $\Delta$. A fuller definition is written in the operational semantics. It checks that we are attempting field access on a record, and that the type is inferred to be the field type.
+\rn{TE-FIELD} defers to $\mathsf{fld}$, which gives the type of a field on a record (via the record table $\Delta$, defined fully in the operational semantics) or a built-in list field ($\kw{length}$, $\kw{head}$, $\kw{tail}$). $\mathsf{fld}$ is undefined on $\kw{EmptyList}$, so list fields require a known element type.
 
-\rn{TE-LAMBDA} is the first rule we see extend the typing context $\Gamma$. We need to set the type of each parameter in the typing context for the expression, which should have the same return type of the lambda expression.
+\rn{TE-LAMBDA} is the first rule we see extend the typing context $\Gamma$. We need to set the type of each parameter in the typing context for the body expression, whose type must be assignable ($\sqsubseteq$) to the lambda's declared return type.
 
-\rn{TE-COND} uses the $\mathsf{widest}$ function to allow conditional expressions with differing number types on either side.
+\rn{TE-COND} uses the $\mathsf{join}$ function to allow conditional expressions with differing number types on either side. We use $\mathsf{join}$ over $\mathsf{widest}$ as the conditional expression is of higher precedence than lists.
+
+\rn{TE-List} uses sequencial $\mathsf{join}$ calls to return the widest type (type can also be a list type) that the list should be.
+
+\rn{TE-EMPTY-LIST} is trivial.
+
+\rn{TE-LIST-INDEX} requires a list on the left and a $\kw{Nat}$ index on the right (indices are not widened), and gives the element type.
 
 \subsubsection{Statement typing}
 \begin{mathpar}
   	\inferrule*[right=TS-DECL]
-  	{ \Gamma \vdash e : \tau}
+  	{ \Gamma \vdash e : \tau' \\ \tau' \sqsubseteq \tau}
   	{ \Gamma \vdash_{\tau_r} \kw{Var}\ x:\tau = e \dashv \Gamma, x:\tau}
   	\and
   	\inferrule*[right=TS-READ]
@@ -203,7 +265,7 @@ Note that in \rn{TE-NUM} the type is dependant exclusively on the presence of a 
   	{ \Gamma \vdash_{\tau_r} \kw{Var}\ x : \tau= \kw{Read} \dashv \Gamma,x:\tau}
   	\and
   	\inferrule*[right=TS-ASSIGN]
-  	{ x:\tau \in \Gamma \\ \Gamma\vdash e:\tau }
+  	{ x:\tau \in \Gamma \\ \Gamma\vdash e:\tau' \\ \tau' \sqsubseteq \tau }
   	{ \Gamma\vdash_{\tau_r} x:=e \dashv\Gamma}
   	\and
   	\inferrule*[right=TS-WHILE]
@@ -215,7 +277,7 @@ Note that in \rn{TE-NUM} the type is dependant exclusively on the presence of a 
   	{ \Gamma\vdash_{\tau_r} \kw{If}\ (e)\ \kw{Then}\ b_1\ \kw{Else} \ b_2 \dashv \Gamma}
   	\and
   	\inferrule*[right=TS-RET]
-  	{\Gamma\vdash e : \tau_r}
+  	{\Gamma\vdash e : \tau' \\ \tau' \sqsubseteq \tau_r}
   	{\Gamma \vdash_{\tau_r}\kw{Ret}\ e\dashv\Gamma}
   	\and
   	\inferrule*[right=TS-PRINT]
@@ -236,7 +298,7 @@ In these rules, we also pass around a return type $\tau_r$ meaning the return ty
 
 In \rn{TS-DECL} and \rn{TS-READ} we extend $\Gamma$ to contain (`know') the type of a variable. We leave \rn{TS-READ} as an informal rule, as it can only be judged at input time.
 
-\rn{TS-ASSIGN} asks $\Gamma$ for the type of $x$. This is a parse error if not defined. Then we check that we are trying to assign a variable to an expression of the same type.
+\rn{TS-ASSIGN} asks $\Gamma$ for the type of $x$. This is a parse error if not defined. Then we check that we are trying to assign a variable to an expression of an assignable type ($\tau' \sqsubseteq \tau$).
 
 \rn{TS-WHILE} and \rn{TS-COND} are trival.
 
@@ -278,7 +340,7 @@ The rules premises:
  	$x_1 : \tau_1, \ldots, x_n : \tau_n$. $\rho[\overline{x} \mapsto \overline{\ell}]$ abbreviates
  	$\rho[x_1 \mapsto \ell_1, \ldots, x_n \mapsto \ell_n]$, and $\overline{\ell} \notin \mathrm{dom}(\sigma)$
  	means the $\ell_i$ are distinct and none is in $\mathrm{dom}(\sigma)$.
- 	\item a value $v\ ::=\ n\mid \kw{True} \mid \kw{False}\mid R(\overline{v_n})\mid \clo{\overline{x}}{b}{\rho}$. $b$ in closure is a block body.
+ 	\item a value $v\ ::=\ n\mid \kw{True} \mid \kw{False}\mid R(\overline{v_n})\mid \clo{\overline{x}}{b}{\rho}\mid[\ ]\mid[\overline{v_n}]$. $b$ in closure is a block body.
  	\item an environment $\rho : \kw{Var} \to \kw{Loc}$ to mean a function that maps a variable name $\kw{Var}$ to a location $\kw{Loc}$.
  	\item that the store $\sigma : \kw{Loc} \to \kw{Value}$ maps a location $\kw{Loc}$ to a value $\kw{Value}$.
  	\item $f[a\mapsto b]$ to mean update $f$ so that it maps $a$ to $b$.
@@ -286,6 +348,18 @@ The rules premises:
 	\item the outcome of a \textit{statement} $r\ ::=\ \mathsf{normal}\mid \mathsf{ret}\ v$, where $\mathsf{normal}$ is a statement that does not return nor throw an error, and $\mathsf{ret}\ v$ is a statement that returns a value $v$.
 	\item $\mathsf{\hat{\oplus}}$ to mean the result of a binary operation $\oplus$ on two values, $v_1, v_2$
 	\item $\Delta$ for the \textit{record table}, which maps each record name $R$ declared in the program to its fields, so $\Delta(R) = (f_1 : \tau_1, \ldots, f_n : \tau_n)$. $\Delta$ is built once by \rn{P-PROG} and never changes, so we leave it implicit in the judgements.
+	\item
+	\[
+	\mathsf{fld}(v, f) =
+	\begin{cases}
+		v_i                 & v = R(\overline{v_n}),\ \Delta(R) = (\overline{f{:}\tau}),\ f = f_i \\
+		n                   & v = [v_1, \dots, v_n],\ f = \kw{length} \\
+		v_1                 & v = [v_1, \dots, v_n],\ n \ge 1,\ f = \kw{head} \\
+		{[v_2, \dots, v_n]} & v = [v_1, \dots, v_n],\ f = \kw{tail} \\
+		\text{undefined}    & \text{otherwise}
+	\end{cases}
+	\]
+	
  \end{itemize}
 \subsubsection{Semantic Judgements}
 We write four kinds of judgement:
@@ -320,7 +394,7 @@ We write four kinds of judgement:
           A program $p$ runs and ends with an updated store $\sigma'$
 \end{itemize}
 
-\subsubsection{Evaluation Semantics}
+\subsubsection{Expression Semantics}
 \begin{mathpar}
 	\inferrule*[right=E-Num]
 	{ }
@@ -359,11 +433,9 @@ We write four kinds of judgement:
 		\eval
 		\config{v_2, \sigma''}}
 		\and
-		\inferrule*[right=E-Field]
-		{\config{e, \rho, \sigma} \eval \config{R(v_1, \ldots, v_n), \sigma'} \\
-			\Delta(R) = (f_1 : \tau_1, \ldots, f_n : \tau_n) \\
-			f = f_i}
-		{\config{e.f, \rho, \sigma} \eval \config{v_i, \sigma'}}
+		\inferrule*[right=E-FIELD]
+		{\config{e,\rho,\sigma}\eval\config{v,\sigma'} \\ \mathsf{fld}(v, f) = v'}
+		{\config{e.f,\rho,\sigma}\eval\config{v',\sigma'}}
 		\and
 		\inferrule*[right=E-Record]
 		{\config{e_i, \rho, \sigma_{i-1}} \eval \config{v_i, \sigma_i} \quad (1 \le i \le n)}
@@ -383,6 +455,18 @@ We write four kinds of judgement:
 		{\config{e(\overline{e}), \rho, \sigma}
 			\eval
 			\config{v, \sigma'}}
+		\and
+		\inferrule*[right=E-LIST] 
+		{\config{e_i, \rho, \sigma_{i-1}} \eval \config{v_i, \sigma_i} \quad (1 \le i \le n)}
+		{\config{[\overline{e}],\rho,\sigma}\eval\config{[\overline{v}],\sigma_n}}
+		\and
+		\inferrule*[right=E-EMPTY-LIST]
+		{ }
+		{ \config{[\ ],\rho,\sigma}\eval\config{[\ ], \sigma}}
+		\and 
+		\inferrule*[right=E-LIST-INDEX]
+		{ \config{e_1,\rho,\sigma}\eval\config{\overline{v},\sigma_1} \\ \config{e_2, \rho,\sigma_1} \eval \config{i,\sigma_2}}
+		{ \config{e_1\$e_2,\rho,\sigma}\eval\config{v_{i+1}, \sigma_2}}
 \end{mathpar}
 
 \rn{E-NUM}, \rn{E-TRUE}, \rn{E-FALSE} are trivial.
@@ -399,8 +483,11 @@ In \rn{E-RECORD} we see that, for a record construction $R(\overline{e})=R(e_1,\
 
 In \rn{E-LAMBDA} we must return a closure. The closure $\clo{\overline{x}}{\{\kw{Ret}\ e;\}}{\rho}$ represents everything a function needs to run: the parameters $\overline{x}$, the return statement (a lambda is a function that must immediately return an expression on those parameters with its own arguments), and the environment $\rho$ in which it is created (it can see variables defined before it is created).
 
-In \rn{E-APP} we first evaluate $e$, which must give a closure $\clo{\overline{x}}{b}{\rho_\theta}$ (made by \rn{E-LAMBDA}, or by \rn{P-PROG} for a $\kw{Func}$). We then evaluate each argument $e_i$ to a value $v_i$ from left to right, passing the store along as in \rn{E-RECORD}, ending with $\sigma_n$. Each parameter needs somewhere to live, so we pick fresh locations $\overline{\ell}$ that are not already in $\sigma_n$; because every call gets new locations, a recursive call cannot overwrite its caller's parameters. Finally we run the body $b$ in the closure's environment $\rho_\theta$ extended with $\overline{x} \mapsto \overline{\ell}$, and in the store $\sigma_n$ extended with $\overline{\ell} \mapsto \overline{v}$. The body runs in $\rho_\theta$, not the caller's $\rho$, so it sees the variables from where the function was written rather than where it is called (static scoping). The body must finish with $\mathsf{ret}\ v$: this is the one place an outcome is turned back into a value, and $v$ with the final store $\sigma'$ is the result of the call.
+In \rn{E-APP} we first evaluate $e$, which must give a closure $\clo{\overline{x}}{b}{\rho_\theta}$ (made by \rn{E-LAMBDA}, or by \rn{P-PROG} for a $\kw{Func}$). We then evaluate each argument $e_i$ to a value $v_i$ from left to right, passing the store along as in \rn{E-RECORD}, ending with $\sigma_n$. Each parameter needs somewhere to live, so we pick fresh locations $\overline{\ell}$ that are not already in $\sigma_n$; because every call gets new locations, a recursive call cannot overwrite its caller's parameters. Finally we run the body $b$ in the closure's environment $\rho_\theta$ extended with $\overline{x} \mapsto \overline{\ell}$, and in the store $\sigma_n$ extended with $\overline{\ell} \mapsto \overline{v}$. The body runs in $\rho_\theta$, not the caller's $\rho$, so it sees the variables from where the function was written rather than where it is called (static scoping). The body must finish with $\mathsf{ret}\ v$: this is the one place an outcome is turned back into a value, and $v$ with the final store $\sigma'$ is the result of the call. \rn{E-APP} is the only expression semantic rule that mutates state, as a function has access to global variables.
 
+$\rn{E-LIST}$ and $\rn{E-EMPTY-LIST}$ are trivial.
+
+In $\rn{E-LIST-INDEX}$ we require that $e_1$ evaluates to a list, and that $e_2$ evaluates to a number $i$. Given that $e_1\eval\overline{v}=v_1,\ldots,v_n$, $v_{i+1}$ is the 0 indexed value. 
 \subsubsection{Statement Semantics}
 \begin{mathpar}
     \inferrule*[right=S-Var]
@@ -688,59 +775,6 @@ Note that we could have defined a method per semantic rule, but that not only al
 With all terms, forms, rules, and judgements implemented, we now have a working AST Interpreter: One can define an program using these structural elements and execute it with $\rn{P-PROG}$ (\texttt{P\_PROG.Execute()}).
 
 \subsection{Type Checker}
-
-\subsubsection{Sub-Typing}
-
-On reaching the type-checker, we reach a fundamental design decision: Sub-typing.
-
-We have seen that we don't have a way to differentiate between $\kw{Nat}$ and $\kw{Int}$ literals. We could have asked the user to write $\kw{32n}$ or $\kw(32i)$, but frankly the payout isn't worth it at this stage.
-
-Instead, we say that $\kw{Num}$ types can \textit{widen} with $\kw{Nat}\sqsubseteq\kw{Int}\sqsubseteq\kw{Real}$. Essentially, any type can be assigned to a type on the right of it.
-
-This requires the notion of type \textit{Coercion} and \textit{Promotion} (applying only to $\kw{Num}$ types).
-
-Coercion takes two optionally distinct value types $v1,v2$ and returns two values of the same type (the widest possible).
-
-Promotion takes a value and returns that numerical value in any wider type.
-
-This is required for the implementation of operations. When an operation receives two values, it first coerces the two operands to the same type, and returns the evaluated value in that type. This means that we can implement $\kw{Nat}+\kw{Real}$, but we require that the return type is $\kw{Real}$ .
-
-\subsubsection{Implementation}
-We first define the type context $\Gamma$ in code:
-\begin{lstlisting}[language=CSharp, tabsize=4]
-	public sealed record Context(ImmutableDictionary<string, Type> Vars) {
-		public Type Lookup(string name)
-			=> Vars.TryGetValue(name, out Type? t) 
-				? t 
-				: throw new UnBoundVarException(name);
-		
-		public Context Bind(string name, Type type)
-			=> this with { Vars = Vars.SetItem(name, type) };
-	}
-\end{lstlisting}
-
-This closely follows \texttt{Env}.
-
-We can lookup a variable's type, and bind a variable to a type. Again, binding a variable's type returns a new $\Gamma$ so that individual rules can handle state.
-
-With this we construct a type-checker that implements our type system.
-
-The type-checker has a main \texttt{TypeChecker.Check(P\_Prog)} that builds the global context and recurses down the program, type-checking every statement, expression, and block in turn:
-\begin{lstlisting}[language=csharp, tabsize=4]
-public void Check(P_Prog p) {
-	foreach(D_Record r in p.Records) {
-		delta.Add(r.Name, r.Params);
-	}
-	
-	Dictionary<string, Type> vars = [];
-	foreach (D_Func f in p.Funcs) {
-		vars.Add(f.Name, new T_Func(f.Params.Select(x => x.Type).ToList(), f.ReturnType));
-	}
-	
-	CheckProgram(p, new Context(vars.ToImmutableDictionary()));
-} 
-\end{lstlisting}
-
 
 
 

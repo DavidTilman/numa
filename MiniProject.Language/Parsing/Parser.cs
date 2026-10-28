@@ -3,6 +3,7 @@ using MiniProject.Language.Lexing;
 using static MiniProject.Language.Lexing.TokenType;
 using Type = MiniProject.Language.Structure.Type;
 using MiniProject.Language.Exceptions;
+using System.Security;
 
 namespace MiniProject.Language.Parsing;
 
@@ -193,6 +194,11 @@ public class Parser
                 t = new T_Func(types, ParseType());
                 
                 break;
+            case L_SQUARE:
+                Type lt = ParseType();
+                Expect(R_SQUARE);
+                t = new T_List(lt);
+                break;
             default: throw new InvalidParseException(tok.Type.GetType(), typeof(Type));
         }
 
@@ -323,19 +329,49 @@ public class Parser
                     └ ParsePrimary   literals, x, (e), New R(...), Lambda   (tightest)
     */
     private Expr ParseExpression() {
+        if (Check(L_SQUARE))
+        {
+            return ParseList();
+        }
+
         Expr left = ParseBinary();
 
         // e
-        if (!Check(QUESTION)) 
-            return left;
-        
-        // e ? e1 : e2
-        Expect(QUESTION);
-        Expr e1 = ParseExpression();
-        Expect(COLON);
-        Expr e2 = ParseExpression();
-        
-        return new E_Cond(left, e1, e2);
+        if (Check(DOLLAR))
+        {
+            Expect(DOLLAR);
+            return new E_Index(left, ParseExpression());
+        }
+
+        if (Check(QUESTION))
+        {
+            // e ? e1 : e2
+            Expect(QUESTION);
+            Expr e1 = ParseExpression();
+            Expect(COLON);
+            Expr e2 = ParseExpression();
+            
+            return new E_Cond(left, e1, e2);
+        }
+
+        return left;
+    }
+
+    private Expr ParseList()
+    {
+        Expect(L_SQUARE);
+        List<Expr> exprs = [];
+        while(!Check(R_SQUARE))
+        {
+            exprs.Add(ParseExpression());
+            if (!Check(COMMA))
+            {
+                break;
+            }
+            else { Expect(COMMA); }
+        }
+        Expect(R_SQUARE);
+        return new E_List(exprs);
     }
 
     private Expr ParseBinary(int minPrec = 1) {

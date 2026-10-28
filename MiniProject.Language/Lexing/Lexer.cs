@@ -18,12 +18,15 @@ public class Lexer
         { ')', R_PAREN },
         { '{', L_BRACE },
         { '}', R_BRACE },
+        { '[', L_SQUARE },
+        { ']', R_SQUARE },
         { ',', COMMA },
         { '.', DOT },
         { ':', COLON },
         { ';', SEMICOLON },
         { '?', QUESTION },
         { '=', EQUALS },
+        { '$', DOLLAR },
     };
 
     static readonly Dictionary<string, TokenType> double_symbols = new()

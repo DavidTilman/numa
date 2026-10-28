@@ -42,3 +42,19 @@ public sealed record T_Record(string Name) : Type
         return Name;
     }
 }
+
+public sealed record T_List(Type Type) : Type
+{
+    public override string ToString()
+    {
+        return $"[{Type}]";
+    }
+}
+
+public sealed record T_EmptyList() : Type
+{
+    public override string ToString()
+    {
+        return $"[]";
+    }
+}

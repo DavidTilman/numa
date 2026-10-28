@@ -68,3 +68,19 @@ public sealed record V_Closure(IReadOnlyList<Param> Params, B_Block Body, Env En
         return $"<function({string.Join(", ", Params.Select(x => $"{x.Name}: {x.Type}"))})>";
     }
 }
+
+public sealed record V_List(IReadOnlyList<Value> Elements) : Value
+{
+    public Value Access(V_Nat n)
+    {
+        if (n.Value >= (ulong)Elements.Count)
+        {
+            throw new Exception($"Index {n} out of range.");
+        }
+        return Elements[(int)n.Value];
+    }
+    public override string Show(Env env)
+    {
+        return $"[{string.Join(", ", Elements.Select(x => x.Show(env)))}]";
+    }
+}

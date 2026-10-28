@@ -45,12 +45,17 @@ public sealed record E_Op(Expr E1, Operation Op, Expr E2) : Expr
 }
 public sealed record E_Field(Expr Target, string Field) : Expr
 {
-    public override Value Evaluate(Env Env)
-    {
-        if (Target.Evaluate(Env) is not V_Record rec)
-            throw new Exception("Attempted field access on a non-record value");
+    public override Value Evaluate(Env Env) => (Target.Evaluate(Env), Field) switch {
+        (V_List l, "length") => new V_Nat((ulong)l.Elements.Count),
+        (V_List l, "head")   => l.Access(new V_Nat(0)),
+        (V_List l, "tail")   => new V_List(l.Elements.Skip(1).ToList()),
+        (V_Record rec, _)    => RecordField(rec, Env),
+        _ => throw new Exception("No such attribute."),
+    };
         
-        IReadOnlyList<Param> rec_params = Env.GetRecord(rec.Name);
+    private Value RecordField(V_Record rec, Env env)
+    {
+        IReadOnlyList<Param> rec_params = env.GetRecord(rec.Name);
         
         int index = -1;
         for (int i = 0; i < rec_params.Count; i++) 
@@ -93,6 +98,15 @@ public sealed record E_RecCon(string Target, IReadOnlyList<Expr> Args) : Expr
     }
 }
 
+public sealed record E_List(IReadOnlyList<Expr> Exprs) : Expr
+{
+    public override Value Evaluate(Env Env)
+    {
+        List<Value> elements = [.. Exprs.Select(x => x.Evaluate(Env))];
+        return new V_List(elements);
+    }
+}
+
 public sealed record E_Lambda(IReadOnlyList<Param> Params, Type ReturnType, Expr Body) : Expr
 {
     public override Value Evaluate(Env Env) => new V_Closure(Params, new B_Block([new S_Return(Body)]), Env);
@@ -103,5 +117,19 @@ public sealed record E_Cond(Expr Cond, Expr OnTrue, Expr OnFalse) : Expr
     {
         if (Cond.Evaluate(Env) is not V_Bool cond) throw new Exception("Expression did not evaluate to a boolean.");
         return cond.Value ? OnTrue.Evaluate(Env) : OnFalse.Evaluate(Env);
+    }
+}
+
+public sealed record E_Index(Expr left, Expr right) : Expr
+{
+    public override Value Evaluate(Env Env)
+    {
+        Value v1 = left.Evaluate(Env);
+        if (v1 is not V_List l)
+            throw new Exception("Attempted index on non-list.");
+        Value v2 = right.Evaluate(Env);
+        if (v2 is not V_Nat n) 
+            throw new Exception("Non-Nat indexer.");
+        return l.Access(n);
     }
 }

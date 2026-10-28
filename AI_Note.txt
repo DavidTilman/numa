@@ -260,3 +260,32 @@ TE-/TS- rules; it corrected them and wrote TP-PROG.
   variable at the inferred type of its initialiser rather than its annotation,
   so counters/parameters are typed to stay Assignable (e.g. recursion uses Int
   params because Nat - Nat widens to Int).
+
+
+8. Report: lists and subtyping
+------------------------------
+
+Cross-checked the new list feature (T_List/T_EmptyList, E_List, E_Index, the
+list fields .length/.head/.tail, + as concatenation, Assignable) against the
+report and listed what was missing or wrong. I wrote the LaTeX; I applied most
+of the type-side myself from its suggestions, and it then wrote the subtyping
+part directly into report.tex.
+
+- Diagnosed the gaps/errors: value grammar omitted list values; TE-LIST
+  concluded [tau_n] instead of [join of all elements]; E-LIST-INDEX returned
+  v_{i-1} (off-by error vs the 0-based Access); no typing rule for $ indexing;
+  .length/.head/.tail unspecified (TE-/E-FIELD only covered records); and no
+  assignability/subtyping to justify Var xs:[Int]=[] (and Nat->Real decls).
+- Designed the fld meta-function (type- and value-level) so e.f generalises to
+  records plus built-in list fields as one TE-FIELD/E-FIELD rule, undefined on
+  EmptyList; applied by me into the report.
+- Wrote the subtyping relation tau <= tau' (S-REFL, Nat<=Int, Int<=Real,
+  Nat<=Real, EmptyList<=[tau], covariant lists) matching Assignable, and amended
+  TE-APP, TE-RECORD, TE-LAMBDA, TS-DECL, TS-ASSIGN and TS-RET to take an
+  assignable (not exact) type, with TS-DECL binding the annotated type so
+  EmptyList never leaks into the context. Deliberately no global subsumption
+  rule, to stay syntax-directed and match the checker.
+- LaTeX: diagnosed compile errors from a cases block (extra alignment tabs,
+  missing $, a \small used in math mode, overfull from the wide record case);
+  gave clean blocks and rebuilt the PDF to confirm (no errors; pre-existing
+  empty-bibliography warning only).

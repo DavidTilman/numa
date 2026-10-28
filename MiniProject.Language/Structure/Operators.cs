@@ -42,8 +42,19 @@ public sealed record OP_Plus : Operation
             (V_Nat a, V_Nat b) => new V_Nat(a.Value + b.Value),
             (V_Int a, V_Int b) => new V_Int(a.Value + b.Value),
             (V_Real a, V_Real b) => new V_Real(a.Value + b.Value),
+            (V_List l1, V_List l2) => ListConcat(l1, l2),
             _ => throw new Exception("Invalid operation.")
         };
+    }
+
+    private V_List ListConcat(V_List l1, V_List l2)
+    {
+        List<Value> vs = l1.Elements.ToList();
+        foreach (Value v in l2.Elements)
+        {
+            vs.Add(v);
+        }
+        return new V_List(vs);
     }
 }
 

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using MiniProject.Language.Structure;
 using MiniProject.Language.Exceptions;
 using Type = MiniProject.Language.Structure.Type;
+using System.Security.AccessControl;
 namespace MiniProject.Language.TypeChecking;
 
 public sealed record Context(ImmutableDictionary<string, Type> Vars) {
@@ -35,7 +36,22 @@ public class TypeChecker {
         _ => null
     };
 
+    static Type Join(Type t1, Type t2) => (t1, t2) switch {
+        // An empty list is absorbed by whatever list it meets; two empties stay empty.
+        (T_EmptyList, T_EmptyList)         => new T_EmptyList(),
+        (T_EmptyList, T_List)              => t2,
+        (T_List, T_EmptyList)              => t1,
+        (T_List l1, T_List l2) => new T_List(Join(l1.Type, l2.Type)),
+        _ when SameType(t1, t2)            => t1,
+        _ when Widest(t1, t2) is Type w    => w,
+        _ => throw new TypeMismatchException(t1, t2),
+    };
+
     static Type Sig(Operation op, Type t1, Type t2) => (op, t1, t2) switch {
+        // Concatenation: the result type is the join of the two list types,
+        // which already absorbs an empty-list operand on either side.
+        (OP_Plus, T_List or T_EmptyList, T_List or T_EmptyList)
+            => Join(t1, t2),
         (OP_Plus o, Type ot1, Type ot2) 
             => Widest(ot1, ot2) 
             ?? throw new OperationNotDefinedException(o, ot1, ot2),
@@ -73,9 +89,11 @@ public class TypeChecker {
     };
 
     static bool Assignable(Type from, Type to)
-        => SameType(from, to) 
-        || (Widest(from, to) is Type w 
-        && SameType(w, to));
+        => (from, to) switch {
+            (T_EmptyList, T_List) => true,   // [] is assignable to any list type
+            (T_List lf, T_List lt) => Assignable(lf.Type, lt.Type),
+            _ => SameType(from, to) || (Widest(from, to) is Type w && SameType(w, to)),
+        };
     private static bool FuncsAssignable(T_Func f1, T_Func f2)
         => f1.ParamTypes.Count == f2.ParamTypes.Count
         && f1.ParamTypes.Zip(f2.ParamTypes).All(p 
@@ -88,6 +106,7 @@ public class TypeChecker {
                 => FuncsAssignable(f1, f2),
             (T_Record r1, T_Record r2) 
                 => r1.Name == r2.Name,
+            (T_List l1, T_List l2) => SameType(l1.Type, l2.Type),
             _ => a.GetType() == b.GetType(), 
         };
 
@@ -124,8 +143,33 @@ public class TypeChecker {
             E_RecCon rc     => RecordType(rc, g),
             E_Lambda l      => LambdaType(l, g),
             E_Cond c        => CondType(c, g),
+            E_List ls       => ListType(ls,g),
+            E_Index index   => ListAccessType(index, g),
             _ => throw new InternalException("Unhandled expression.")
     };
+
+    private Type ListAccessType(E_Index access, Context g)
+    {
+        Type l = CheckExpr(access.left, g);
+        if (l is not T_List lt) 
+            throw new Exception(); // TODO
+        Type n = CheckExpr(access.right, g);
+        if (n is not T_Nat i) 
+            throw new Exception(); // TODO
+        return lt.Type;
+    }
+
+    private Type ListType(E_List ls, Context g)
+    {
+        if (ls.Exprs.Count == 0)
+            return new T_EmptyList();
+
+        Type elem = CheckExpr(ls.Exprs[0], g);
+        for (int i = 1; i < ls.Exprs.Count; i++)
+            elem = Join(elem, CheckExpr(ls.Exprs[i], g));
+
+        return new T_List(elem);
+    }
 
     private Type CondType(E_Cond c, Context g) {
         Type t = CheckExpr(c.Cond, g);
@@ -133,10 +177,7 @@ public class TypeChecker {
             throw new UnexpectedTypeException(new T_Bool(), t);
         Type t1 = CheckExpr(c.OnTrue, g);
         Type t2 = CheckExpr(c.OnFalse, g);
-        return SameType(t1,t2) 
-               ? t1 
-               : (Widest(t1,t2) 
-                    ?? throw new TypeMismatchException(t1, t2));
+        return Join(t1,t2);
     }
 
     private T_Func LambdaType(E_Lambda l, Context g) {
@@ -185,19 +226,26 @@ public class TypeChecker {
     }
 
     private Type FieldType(E_Field f, Context g) {
-        if (CheckExpr(f.Target, g) is not T_Record r)
-            throw new NotWellTypedException(f);
+    Type target = CheckExpr(f.Target, g);
+    return (target, f.Field) switch {
+        (T_List,   "length") => new T_Nat(),
+        (T_List l, "head")   => l.Type,     // if you want these
+        (T_List l, "tail")   => l,
+        (T_Record r, _)      => RecordField(r, f),
+        _ => throw new NotWellTypedException(f),
+    };
+}
 
+    private Type RecordField(T_Record r, E_Field f) {
         if (!delta.TryGetValue(r.Name, out var fields))
             throw new UndefinedTypeException(r.Name);
-        
-        return 
-            fields.FirstOrDefault(p => p.Name == f.Field)?.Type
+        return fields.FirstOrDefault(p => p.Name == f.Field)?.Type
             ?? throw new NotWellTypedException(f);
     }
 
+
     Context CheckStmt(Stmt s, Context g, Type? ret) => s switch {
-        S_Decl d    => g.Bind(d.Variable, CheckExpr(d.Expr, g)),
+        S_Decl d    => CheckDecl(d, g),
         S_Read r    => g.Bind(r.Variable, r.Type),
         S_Assign a  => CheckAssignment(a, g),
         S_While w   => CheckWhile(w, g, ret),
@@ -206,6 +254,16 @@ public class TypeChecker {
         S_Print p   => CheckPrint(p, g),
         _ => throw new NotWellTypedException(s)
     };
+
+    private Context CheckDecl(S_Decl d, Context g)
+    {
+        Type et = CheckExpr(d.Expr, g);
+        if (!Assignable(et, d.Type)) throw new TypeMismatchException(et, d.Type);
+        // Bind the declared type, not the inferred one: the annotation is
+        // authoritative, and it absorbs a T_EmptyList initializer (Var xs : [Int] = [])
+        // so the empty-list type never leaks into the context.
+        return g.Bind(d.Variable, d.Type);
+    }
 
     private Context CheckReturn(S_Return rt, Context g, Type? ret) {
         if (ret is null)            
